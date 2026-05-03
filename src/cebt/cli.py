@@ -36,6 +36,11 @@ def output_dir(args: argparse.Namespace, default: str = "data/processed/pilot") 
     return ensure_dir(resolve_path(args.output_dir or default))
 
 
+def processed_dir(config: dict[str, Any]) -> Path:
+    run_name = config.get("project", {}).get("run_name", "pilot")
+    return resolve_path(Path("data/processed") / str(run_name))
+
+
 def sec_client(config: dict[str, Any]) -> SECClient:
     sec = config.get("sec", {})
     user_agent_env = sec.get("user_agent_env", "SEC_USER_AGENT")
@@ -48,6 +53,6 @@ def sec_client(config: dict[str, Any]) -> SECClient:
         user_agent=user_agent,
         base_url=sec.get("base_url", "https://data.sec.gov"),
         archives_url=sec.get("archives_url", "https://www.sec.gov/Archives/edgar/data"),
-        ticker_url=sec.get("ticker_url", "https://www.sec.gov/files/company_tickers_exchange.json"),
+        ticker_url=sec.get("ticker_url", "https://www.sec.gov/files/company_tickers.json"),
         max_requests_per_second=float(sec.get("max_requests_per_second", 8.0)),
     )

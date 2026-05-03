@@ -69,7 +69,7 @@ class SECClient:
         user_agent: str | None = None,
         base_url: str = "https://data.sec.gov",
         archives_url: str = "https://www.sec.gov/Archives/edgar/data",
-        ticker_url: str = "https://www.sec.gov/files/company_tickers_exchange.json",
+        ticker_url: str = "https://www.sec.gov/files/company_tickers.json",
         max_requests_per_second: float = 8.0,
     ) -> None:
         self.user_agent = (
@@ -82,7 +82,11 @@ class SECClient:
         self._last_request = 0.0
         self.session = requests.Session()
         self.session.headers.update(
-            {"User-Agent": self.user_agent, "Accept-Encoding": "gzip, deflate"}
+            {
+                "User-Agent": self.user_agent,
+                "Accept-Encoding": "gzip, deflate",
+                "Accept": "application/json,text/html,*/*",
+            }
         )
 
     def _throttle(self) -> None:

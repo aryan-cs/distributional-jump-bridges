@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from io import StringIO
 from pathlib import Path
 
@@ -58,7 +58,12 @@ def fetch_stooq_prices(ticker: str, start_date: str, end_date: str) -> list[Pric
     response = requests.get(url, timeout=60)
     response.raise_for_status()
     text = response.text.strip()
-    if not text or text.lower().startswith("no data"):
+    if (
+        not text
+        or text.lower().startswith("no data")
+        or "get your apikey" in text.lower()
+        or "captcha" in text.lower()
+    ):
         return []
     rows: list[PriceBar] = []
     for row in csv.DictReader(StringIO(text)):
@@ -78,6 +83,69 @@ def fetch_stooq_prices(ticker: str, start_date: str, end_date: str) -> list[Pric
         except (KeyError, ValueError):
             continue
     return sorted(rows, key=lambda item: item.date)
+
+
+def yahoo_symbol(ticker: str) -> str:
+    return ticker.upper().replace(".", "-")
+
+
+def fetch_yahoo_prices(ticker: str, start_date: str, end_date: str) -> list[PriceBar]:
+    start_day = date.fromisoformat(start_date)
+    end_day = date.fromisoformat(end_date)
+    start = int(datetime.combine(start_day, datetime.min.time(), tzinfo=UTC).timestamp())
+    end = int(datetime.combine(end_day, datetime.min.time(), tzinfo=UTC).timestamp())
+    symbol = yahoo_symbol(ticker)
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        f"?period1={start}&period2={end}&interval=1d&events=history"
+    )
+    response = requests.get(url, timeout=60, headers={"User-Agent": "CEBT research"})
+    response.raise_for_status()
+    payload = response.json()
+    result = payload.get("chart", {}).get("result") or []
+    if not result:
+        return []
+    item = result[0]
+    timestamps = item.get("timestamp") or []
+    quote = (item.get("indicators", {}).get("quote") or [{}])[0]
+    rows: list[PriceBar] = []
+    for idx, stamp in enumerate(timestamps):
+        try:
+            open_price = quote["open"][idx]
+            high = quote["high"][idx]
+            low = quote["low"][idx]
+            close = quote["close"][idx]
+            volume = quote["volume"][idx]
+        except (KeyError, IndexError, TypeError):
+            continue
+        if None in (open_price, high, low, close, volume):
+            continue
+        rows.append(
+            PriceBar(
+                ticker=ticker,
+                date=datetime.fromtimestamp(int(stamp), tz=UTC).date(),
+                open=float(open_price),
+                high=float(high),
+                low=float(low),
+                close=float(close),
+                volume=float(volume),
+                source_url=url,
+            )
+        )
+    return sorted(rows, key=lambda value: value.date)
+
+
+def fetch_public_prices(
+    ticker: str, start_date: str, end_date: str, provider: str = "auto"
+) -> list[PriceBar]:
+    if provider == "stooq":
+        return fetch_stooq_prices(ticker, start_date, end_date)
+    if provider == "yahoo":
+        return fetch_yahoo_prices(ticker, start_date, end_date)
+    stooq_rows = fetch_stooq_prices(ticker, start_date, end_date)
+    if stooq_rows:
+        return stooq_rows
+    return fetch_yahoo_prices(ticker, start_date, end_date)
 
 
 def load_price_rows(path: str | Path) -> dict[str, list[PriceBar]]:

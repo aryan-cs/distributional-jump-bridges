@@ -14,7 +14,10 @@ def make_tables(run_dir: str | Path) -> dict:
         metrics = read_json(path)
         model = path.name.replace("_eval_metrics.json", "")
         for key, value in metrics.items():
-            metric_rows.append({"model": model, "metric": key, "value": value})
+            if isinstance(value, dict):
+                metric_rows.append({"model": model, "metric": key, **value})
+            else:
+                metric_rows.append({"model": model, "metric": key, "value": value})
     write_csv(root / "table_eval_metrics.csv", metric_rows)
     summary = {"metric_rows": len(metric_rows), "source_dir": str(root)}
     write_json(root / "tables_summary.json", summary)

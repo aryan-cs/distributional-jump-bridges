@@ -34,4 +34,5 @@ class CEBTTensorDataset(Dataset):
             "metadata": self.metadata[idx],
             "y": self.y[idx],
             "is_event": self.is_event[idx],
+            "index": torch.as_tensor(self.indices[idx], dtype=torch.long),
         }

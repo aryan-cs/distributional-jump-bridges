@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from cebt.cli import load_run_config, output_dir, parse_args, resolve_path
+from cebt.cli import load_run_config, output_dir, parse_args, processed_dir
 from cebt.evaluation.evaluate import evaluate_model
 from cebt.training.train import train_model
 from cebt.utils.io import write_json
@@ -14,8 +14,9 @@ def main() -> None:
     args = parse_args("Run CEBT ablations")
     config = load_run_config(args.config)
     run_dir = output_dir(args, "data/runs/pilot")
-    feature_path = resolve_path("data/processed/pilot/features.npz")
-    metadata_path = resolve_path("data/processed/pilot/features_metadata.jsonl")
+    features = processed_dir(config)
+    feature_path = features / "features.npz"
+    metadata_path = features / "features_metadata.jsonl"
     results = {}
     specs = [
         ("no_event", config),

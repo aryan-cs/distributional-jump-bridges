@@ -1,0 +1,221 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{amsmath}
+\usepackage{siunitx}
+
+\title{Counterfactual Event Bottlenecks for Leakage-Safe Financial Disclosure Modeling}
+\author{Aryan \and CEBT Research}
+\date{May 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Financial event models often collapse two distinct problems into one representation:
+ordinary market dynamics and the incremental impact of a newly disclosed event. We propose the
+Counterfactual Event Bottleneck Transformer (CEBT), an architecture that predicts a no-event
+baseline from pre-event market history and routes disclosure information through a compact
+stochastic bottleneck that predicts an event-induced residual. The model is trained with matched
+same-ticker no-event controls, a residual-suppression loss for controls, and strict temporal
+feature gates. On a real public-data experiment covering 1,256 SEC 8-K events from 20 large
+U.S. firms between 2021 and 2025, CEBT improves mean squared error over no-event, text-only,
+and concat-fusion baselines while substantially reducing residual magnitude assigned to
+no-event controls. The rank-based return signal remains weak and confidence intervals cross
+zero, so our main finding is not that CEBT is a trading system. Instead, the result supports
+CEBT as a useful architectural decomposition for studying whether disclosure models separate
+event-specific residuals from background market movement.
+\end{abstract}
+
+\section{Introduction}
+
+Disclosure events are difficult modeling targets because market movement after a filing is
+not caused only by the filing. A stock's subsequent return reflects market drift, sector movement,
+liquidity, firm-specific momentum, and the information content of the disclosure itself. Standard
+fusion models mix these sources into one hidden representation, making it hard to tell whether
+the model learned an event effect or simply reproduced ordinary dynamics.
+
+We introduce CEBT, an event modeling architecture that decomposes the forecast into
+\[
+    \hat{y}_{t+h} = f_{\mathrm{no\ event}}(x_{<t}) + g_{\mathrm{event}}(z_e, x_{<t}),
+\]
+where \(f_{\mathrm{no\ event}}\) is learned from pre-event numeric history and \(z_e\) is a compact
+stochastic disclosure bottleneck. The bottleneck is trained with matched no-event controls:
+dates for the same ticker that are far from known SEC 8-K events. For controls, the model is
+penalized when it assigns a large event residual. This makes the residual interpretable as a
+candidate event-specific increment rather than an unconstrained shortcut.
+
+Our contributions are:
+\begin{enumerate}
+    \item A no-event-plus-residual neural architecture for financial disclosure modeling.
+    \item A stochastic event bottleneck trained with matched no-event controls.
+    \item A leakage-safe public-data implementation using SEC accepted timestamps and public
+    price histories.
+    \item A real-data pilot showing that residual control changes model behavior and improves
+    MSE relative to common baselines, while return-ranking signal remains statistically weak.
+\end{enumerate}
+
+\section{Related Work}
+
+CEBT is closest to causal and event-driven financial forecasting. CAMEF studies causal-augmented
+multi-modal financial forecasting \citep{chen2025camef}. Causal Transformer and G-Transformer
+estimate counterfactual outcomes in temporal settings \citep{melnychuk2022causaltransformer,
+feng2024gtransformer}. Time-series foundation models such as Chronos, Time-LLM, MOMENT, and
+Mamba improve sequence modeling capacity but do not isolate disclosure-induced residuals
+\citep{ansari2024chronos,jin2023timellm,wu2024moment,gu2023mamba}. Leakage-focused work such as
+Profit Mirage motivates strict temporal evaluation in financial agents \citep{li2025profitmirage}.
+Subliminal-learning results further motivate caution around hidden outcome signal in generated
+or compressed representations \citep{cloud2025subliminal}.
+
+\section{Method}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/cebt_architecture.png}
+\caption{CEBT decomposes a forecast into no-event dynamics and an event-induced residual routed
+through a compact stochastic bottleneck. Matched no-event controls penalize residuals on dates
+where no disclosure event should be needed.}
+\end{figure}
+
+\paragraph{NoEventDynamics.}
+The no-event module receives a fixed pre-event window of price, volume, market, and relative-return
+features. A Transformer encoder pools this history and predicts the ordinary forward movement
+expected without relying on the event text.
+
+\paragraph{EventBottleneck.}
+The event module embeds the disclosure text and metadata, then parameterizes a Gaussian latent
+\(z_e \sim \mathcal{N}(\mu_e, \sigma_e^2)\). The latent dimension is intentionally small. We add a
+KL term and sparsity term so the event representation cannot behave like an unrestricted text
+embedding.
+
+\paragraph{ResidualOutcomeHead.}
+The residual head predicts an event-induced delta from the no-event state, metadata, and
+\(z_e\). The final forecast is the sum of the no-event forecast and this residual.
+
+\paragraph{Training objective.}
+The loss combines supervised MSE, a no-event control residual penalty, KL regularization,
+latent sparsity, and a small residual-variance consistency penalty:
+\[
+\mathcal{L} =
+\lambda_y \lVert \hat{y} - y \rVert_2^2
++ \lambda_c \mathbb{1}_{control}\lVert \Delta_e \rVert_2^2
++ \lambda_{kl}D_{KL}(q(z_e)\|p(z))
++ \lambda_s\lVert z_e\rVert_1
++ \lambda_v\mathrm{Var}(\Delta_e).
+\]
+
+\section{Data and Leakage Controls}
+
+We build a public-data experiment from SEC EDGAR APIs \citep{secapi}. The paper-scale run covers
+20 large U.S. firms, SEC 8-K filings from 2021--2025, and daily public prices. Each event row stores
+CIK, ticker, accession number, form type, filing date, accepted timestamp, available timestamp,
+source URL, text hash, and local provenance. Event label windows start from the first tradable
+session after public availability. If a filing is accepted after 16:00 ET, the label starts on the
+next trading day.
+
+Features use only prices strictly before the event label start date. Labels use future returns
+only as targets. We construct one same-ticker no-event control for each filing, excluding dates
+within a 10-calendar-day blackout window around known events.
+
+\begin{table}[t]
+\centering
+\caption{Paper-scale public-data substrate.}
+\begin{tabular}{lr}
+\toprule
+Artifact & Count \\
+\midrule
+Companies & 20 \\
+SEC 8-K events & 1,256 \\
+Matched no-event controls & 1,256 \\
+Feature rows & 2,512 \\
+Public price rows & 28,413 \\
+Held-out test rows & 501 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Experiments}
+
+We compare five models: no-event dynamics only, text-only MLP, concat-fusion, CEBT without
+control losses, and full CEBT. The target vector contains five-trading-day abnormal return,
+volatility jump, and volume jump. Confidence intervals are nonparametric bootstrap intervals
+over held-out rows.
+
+\begin{table}[t]
+\centering
+\caption{Held-out paper-scale results. MSE is over the three target dimensions.}
+\begin{tabular}{lrrrr}
+\toprule
+Model & MSE & 95\% CI & Rank IC & 95\% CI \\
+\midrule
+No-event & 0.0448 & [0.0358, 0.0571] & 0.0795 & [-0.0064, 0.1616] \\
+Text-only & 0.0398 & [0.0319, 0.0489] & -0.0280 & [-0.1161, 0.0625] \\
+Concat fusion & 0.0374 & [0.0300, 0.0466] & 0.0071 & [-0.0820, 0.1043] \\
+CEBT, no controls & \textbf{0.0356} & [0.0279, 0.0454] & 0.0585 & [-0.0310, 0.1507] \\
+CEBT & 0.0363 & [0.0286, 0.0459] & 0.0522 & [-0.0355, 0.1442] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/metric_comparison.png}
+\caption{Forecast error with bootstrap confidence intervals. CEBT variants reduce MSE relative to
+no-event, text-only, and concat-fusion baselines in this run.}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/event_delta_controls.png}
+\caption{Mean absolute event residual on true events and matched controls. The full CEBT control
+loss strongly suppresses residuals on controls relative to CEBT without controls.}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.70\linewidth]{figures/prediction_scatter.png}
+\caption{CEBT predicted versus realized abnormal returns on the held-out split. The weak slope
+matches the rank-IC confidence interval crossing zero.}
+\end{figure}
+
+\section{Findings}
+
+\paragraph{Bottleneck decomposition improves regression error.}
+On the paper-scale run, CEBT without control losses has the best MSE, and full CEBT remains better
+than no-event, text-only, and concat-fusion baselines. This suggests that forcing disclosure
+information through a compact residual pathway can improve multi-target event modeling.
+
+\paragraph{Control losses alter the residual semantics.}
+The full CEBT model assigns mean absolute event residual 0.0512 to true events and 0.0164 to
+controls. The no-control variant assigns 0.0765 to true events and 0.0494 to controls. Thus, the
+control objective reduces spurious residual assignment to no-event dates by roughly two-thirds.
+
+\paragraph{Return ranking remains weak.}
+Rank IC confidence intervals cross zero for all models. The architecture improves regression MSE
+and residual behavior, but this experiment does not establish a statistically reliable trading
+ranking signal.
+
+\section{Limitations}
+
+This is a first paper-scale run, not a final investment model. The text encoder is a deterministic
+open hashing baseline rather than a large pretrained financial encoder. The public price source is
+not CRSP, and labels use daily closes rather than intraday event windows. The universe is restricted
+to 20 large firms and 8-K filings. The next version should test pretrained open embeddings,
+larger universes, sector controls, and stronger counterfactual matching.
+
+\section{Conclusion}
+
+CEBT reframes event-driven financial modeling as a decomposition problem: ordinary market dynamics
+plus a disclosure-induced residual. In a real public-data experiment, this decomposition improves
+forecast MSE and makes residual assignment more event-specific, although return-ranking evidence is
+not yet statistically conclusive. The result supports CEBT as a promising architecture for studying
+event-specific effects under strict temporal information boundaries.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

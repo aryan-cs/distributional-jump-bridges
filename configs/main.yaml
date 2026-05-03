@@ -18,12 +18,12 @@ data:
 sec:
   base_url: "https://data.sec.gov"
   archives_url: "https://www.sec.gov/Archives/edgar/data"
-  ticker_url: "https://www.sec.gov/files/company_tickers_exchange.json"
+  ticker_url: "https://www.sec.gov/files/company_tickers.json"
   max_requests_per_second: 8
   user_agent_env: "SEC_USER_AGENT"
 
 prices:
-  provider: "stooq"
+  provider: "auto"
   market_ticker: "SPY"
 
 features:

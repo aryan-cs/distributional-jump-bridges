@@ -1,14 +1,19 @@
 project:
   name: cebt
-  run_name: pilot
-seed: 7
+  run_name: paper_v1
+seed: 17
 
 data:
-  tickers: ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"]
-  start_date: "2022-01-01"
+  tickers: [
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL",
+    "META", "JPM", "XOM", "V", "MA",
+    "COST", "HD", "PG", "NFLX", "JNJ",
+    "BAC", "ABBV", "KO", "CRM", "AMD"
+  ]
+  start_date: "2021-01-01"
   end_date: "2025-12-31"
   forms: ["8-K"]
-  max_events_per_company: 80
+  max_events_per_company: 120
   pre_window: 40
   horizon: 5
   control_blackout_days: 10
@@ -36,11 +41,11 @@ model:
   config_path: "configs/model/cebt_small.yaml"
 
 training:
-  epochs: 20
-  batch_size: 32
+  epochs: 15
+  batch_size: 64
   learning_rate: 0.001
   weight_decay: 0.0001
   amp: true
   split:
-    train_until: "2024-06-30"
-    val_until: "2025-03-31"
+    train_until: "2023-12-31"
+    val_until: "2024-12-31"

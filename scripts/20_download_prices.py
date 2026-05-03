@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from cebt.cli import load_run_config, output_dir, parse_args
-from cebt.data.prices import fetch_stooq_prices
+from cebt.data.prices import fetch_public_prices
 from cebt.utils.io import read_jsonl, write_json, write_jsonl
 
 
@@ -31,9 +31,10 @@ def main() -> None:
     )
     rows = []
     errors = []
+    provider = config.get("prices", {}).get("provider", "auto")
     for ticker in tickers:
         try:
-            rows.extend(bar.to_dict() for bar in fetch_stooq_prices(ticker, start, end))
+            rows.extend(bar.to_dict() for bar in fetch_public_prices(ticker, start, end, provider))
         except Exception as exc:  # pragma: no cover - live network path
             errors.append({"ticker": ticker, "error": repr(exc)})
     write_jsonl(out / "prices.jsonl", rows)

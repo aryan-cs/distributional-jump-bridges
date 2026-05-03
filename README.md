@@ -65,8 +65,20 @@ uv run python scripts/60_ablate.py --config configs/pilot.yaml --output-dir data
 uv run python scripts/70_make_tables.py --config configs/pilot.yaml --output-dir data/runs/pilot
 ```
 
+For the paper-scale v1 run used by the current draft:
+
+```bash
+SEC_USER_AGENT="CEBT academic research <name> <email>" uv run python scripts/10_build_events.py --config configs/paper.yaml --output-dir data/processed/paper_v1
+uv run python scripts/20_download_prices.py --config configs/paper.yaml --output-dir data/processed/paper_v1
+uv run python scripts/30_build_features.py --config configs/paper.yaml --output-dir data/processed/paper_v1
+uv run python scripts/60_ablate.py --config configs/paper.yaml --output-dir data/runs/paper_v1
+uv run python scripts/70_make_tables.py --config configs/paper.yaml --output-dir data/runs/paper_v1
+```
+
+The current draft lives at `paper/main.tex`, with figures in `paper/figures/` and table exports in `paper/tables/`.
+
 ## Data Policy
 
-CEBT uses public SEC filings and public market prices. It does not use paid data, closed-source model APIs, fake research labels, or generated results as evidence. Unit tests use minimal synthetic tensors only to verify code behavior; experiments and reported results must use real downloaded data.
+CEBT uses public SEC filings and public market prices. Price downloads try Stooq first and fall back to Yahoo's public chart endpoint when Stooq requires an API key. It does not use paid data, closed-source model APIs, fake research labels, or generated results as evidence. Unit tests use minimal synthetic tensors only to verify code behavior; experiments and reported results must use real downloaded data.
 
 This project is for research only and is not investment advice.
