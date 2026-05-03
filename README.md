@@ -68,15 +68,16 @@ uv run python scripts/70_make_tables.py --config configs/pilot.yaml --output-dir
 For the paper-scale run used by the current draft:
 
 ```bash
-SEC_USER_AGENT="CEBT academic research <name> <email>" uv run python scripts/10_build_events.py --config configs/paper_v2.yaml --output-dir data/processed/paper_v2
-uv run python scripts/20_download_prices.py --config configs/paper_v2.yaml --output-dir data/processed/paper_v2
-uv run python scripts/30_build_features.py --config configs/paper_v2.yaml --output-dir data/processed/paper_v2
-uv run python scripts/60_ablate.py --config configs/paper_v2.yaml --output-dir data/runs/paper_v2
-uv run python scripts/70_make_tables.py --config configs/paper_v2.yaml --output-dir data/runs/paper_v2
+SEC_USER_AGENT="CEBT academic research <name> <email>" uv run python scripts/10_build_events.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
+uv run python scripts/20_download_prices.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
+uv run python scripts/30_build_features.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
+uv run python scripts/60_ablate.py --config configs/paper_v3.yaml --output-dir data/runs/paper_v3
+uv run python scripts/70_make_tables.py --config configs/paper_v3.yaml --output-dir data/runs/paper_v3
 ```
 
-The larger current-paper run uses `configs/paper_v3.yaml` and follows the same script order with
-`data/processed/paper_v3` and `data/runs/paper_v3`.
+The current paper-scale run uses 7,236 real SEC 8-K events, 7,236 matched no-event controls, and
+2,463 held-out rows. The draft intentionally reports that CEBT is strongest on event ranking and
+residual discipline, not on raw MSE.
 
 The current draft lives at `paper/main.tex`, with figures in `paper/figures/` and table exports in `paper/tables/`.
 

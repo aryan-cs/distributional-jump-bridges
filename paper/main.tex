@@ -43,13 +43,14 @@ stochastic bottleneck that predicts an event-induced residual. The model is trai
 same-ticker no-event controls, a residual-suppression loss for controls, and strict temporal
 feature gates. On a real public-data experiment covering 7,236 SEC 8-K events from 98 usable
 large U.S. firms between 2020 and 2025, full CEBT does not dominate every baseline on raw
-regression error, but it is the only tested model with positive abnormal-return rank IC under
-iid, ticker-clustered, and month-clustered bootstrap intervals. In paired rank-IC comparisons,
-CEBT significantly improves over no-event dynamics and concat fusion, while its improvement over
-the no-control CEBT ablation is positive but not statistically resolved. CEBT also suppresses
-residual magnitude assigned to no-event controls. The main claim is not that CEBT is a deployable
-trading system, but that an explicit event bottleneck and no-event control objective produce a
-more temporally disciplined event-residual representation.
+regression error. Its evidence is narrower but more interesting: CEBT is the only tested model
+with positive held-out abnormal-return rank IC under iid, ticker-clustered, and month-clustered
+bootstrap intervals. In paired rank-IC comparisons, CEBT significantly improves over no-event
+dynamics and concat fusion, while its improvement over the no-control CEBT ablation is positive
+but not statistically resolved. CEBT also suppresses residual magnitude assigned to no-event
+controls. The main claim is not that CEBT is a deployable trading system, but that an explicit
+event bottleneck and no-event control objective produce a more temporally disciplined
+event-residual representation.
 \end{abstract}
 
 \section{Introduction}
@@ -90,12 +91,17 @@ causal-augmented multi-modal financial forecasting \citep{chen2025camef}. Causal
 G-Transformer estimate counterfactual outcomes in temporal settings \citep{melnychuk2022causaltransformer,
 feng2024gtransformer}. The architectural ingredients also connect to Transformers
 \citep{vaswani2017attention}, variational latent-variable models \citep{kingma2013autoencoding},
-and the information bottleneck principle \citep{tishby2000information}. Time-series foundation
-models such as Chronos, Time-LLM, MOMENT, and Mamba improve sequence modeling capacity but do not
-isolate disclosure-induced residuals \citep{ansari2024chronos,jin2023timellm,wu2024moment,
-gu2023mamba}. Leakage-focused work such as Profit Mirage motivates strict temporal evaluation in
-financial agents \citep{li2025profitmirage}. Subliminal-learning results further motivate caution
-around hidden outcome signal in generated or compressed representations \citep{cloud2025subliminal}.
+and the information bottleneck principle \citep{tishby2000information}. Financial-text work shows
+that disclosure language contains useful signal but is easy to confound with disclosure timing,
+firm identity, and market state \citep{loughran2011liability,cohen2020lazy,araci2019finbert}.
+Time-series foundation models such as Chronos, Time-LLM, MOMENT, and Mamba improve sequence
+modeling capacity but do not isolate disclosure-induced residuals
+\citep{ansari2024chronos,jin2023timellm,wu2024moment,gu2023mamba}. Financial LLM benchmarks and
+agents test retrieval or question-answering over filings rather than a new event-residual
+architecture \citep{islam2023financebench,finrate2026}. Leakage-focused work such as Profit
+Mirage motivates strict temporal evaluation in financial agents \citep{li2025profitmirage}.
+Subliminal-learning results further motivate caution around hidden outcome signal in generated or
+compressed representations \citep{cloud2025subliminal}.
 
 \section{Method}
 
@@ -105,7 +111,19 @@ around hidden outcome signal in generated or compressed representations \citep{c
 \caption{CEBT decomposes a forecast into no-event dynamics and an event-induced residual routed
 through a compact stochastic bottleneck. Matched no-event controls penalize residuals on dates
 where no disclosure event should be needed.}
+\label{fig:architecture}
 \end{figure}
+
+\paragraph{Notation and estimand.}
+Each sample \(i\) has a label start date \(\tau_i\), a 40-trading-day pre-event tensor
+\(X_i \in \mathbb{R}^{40 \times 8}\), an event embedding \(e_i \in \mathbb{R}^{256}\), metadata
+\(m_i \in \mathbb{R}^{6}\), a control indicator \(c_i\), and a target vector
+\(y_i \in \mathbb{R}^{3}\). The three targets are five-trading-day market-adjusted return,
+volatility jump, and volume jump. CEBT estimates a predictive event residual,
+not an identified structural treatment effect. The counterfactual claim is therefore modest:
+matched no-event rows define a placebo pressure that encourages the residual channel to be small
+when no disclosure is present, while real causal identification would require stronger
+assumptions and intraday or quasi-experimental evidence.
 
 \paragraph{NoEventDynamics.}
 The no-event module receives a fixed pre-event window of price, volume, market, and relative-return
@@ -114,42 +132,68 @@ expected without relying on the event text.
 
 \paragraph{EventBottleneck.}
 The event module embeds the disclosure text and metadata, then parameterizes a Gaussian latent
-\(z_e \sim \mathcal{N}(\mu_e, \sigma_e^2)\). The latent dimension is intentionally small. We add a
-KL term and sparsity term so the event representation cannot behave like an unrestricted text
-embedding.
+\(q_\phi(z_i \mid e_i,m_i)=\mathcal{N}(\mu_i,\mathrm{diag}(\exp(\ell_i)))\). During training,
+\(z_i=\mu_i+\epsilon\exp(\ell_i/2)\), \(\epsilon\sim\mathcal{N}(0,I)\); at evaluation, we use
+\(\mu_i\). The prior is \(p(z)=\mathcal{N}(0,I)\). The latent dimension is intentionally small:
+the paper-scale model uses eight latent coordinates, hidden width 96, two Transformer encoder
+layers, four attention heads, and dropout 0.10. We add a KL term and sparsity term so the event
+representation cannot behave like an unrestricted text embedding.
 
 \paragraph{ResidualOutcomeHead.}
 The residual head predicts an event-induced delta from the no-event state, metadata, and
-\(z_e\). The final forecast is the sum of the no-event forecast and this residual.
+\(z_i\). The final forecast is the sum of the no-event forecast and this residual:
+\begin{equation}
+    \hat{y}_i = b_\theta(X_i,m_i) + \Delta_\theta(s_i,z_i,m_i),
+    \label{eq:decomposition}
+\end{equation}
+where \(s_i\) is the pooled no-event state.
 
 \paragraph{Training objective.}
 The loss combines supervised MSE, a no-event control residual penalty, KL regularization,
 latent sparsity, and a small residual-variance consistency penalty:
-\[
+\begin{equation}
 \mathcal{L} =
 \lambda_y \lVert \hat{y} - y \rVert_2^2
 + \lambda_c \mathbb{1}_{control}\lVert \Delta_e \rVert_2^2
 + \lambda_{kl}D_{KL}(q(z_e)\|p(z))
 + \lambda_s\lVert z_e\rVert_1
 + \lambda_v\mathrm{Var}(\Delta_e).
-\]
+\label{eq:loss}
+\end{equation}
+For the paper-scale run, \(\lambda_y=1.0\), \(\lambda_c=0.25\), \(\lambda_{kl}=0.01\),
+\(\lambda_s=0.001\), and \(\lambda_v=0.05\). The control penalty is averaged over no-event rows
+in each batch. The consistency term is the batch variance of the residual output and is included
+only as a small stabilizer, not as the main source of the result.
 
 \section{Data and Leakage Controls}
 
 We build a public-data experiment from SEC EDGAR APIs \citep{secapi}. The paper-scale run covers
-98 usable large U.S. firms, SEC 8-K filings from 2020--2025, and daily public prices. Each event row stores
-CIK, ticker, accession number, form type, filing date, accepted timestamp, available timestamp,
-source URL, text hash, and local provenance. Event label windows start from the first tradable
-session after public availability. If a filing is accepted after 16:00 ET, the label starts on the
-next trading day.
+98 usable large U.S. firms, SEC 8-K filings from 2020--2025, and daily public prices. Tickers are
+mapped to CIKs through the SEC company-tickers file. Filings are read from SEC submissions JSON,
+including archived submissions, using the SEC \texttt{acceptanceDateTime} field and the primary
+document URL in the EDGAR archive. The text parser removes scripts, styles, and markup with
+BeautifulSoup and stores the extracted text plus SHA-256 provenance. Each event row stores CIK,
+ticker, accession number, form type, filing date, accepted timestamp, available timestamp, source
+URL, text hash, and local provenance.
 
-Features use only prices strictly before the event label start date. Labels use future returns
-only as targets. We construct one same-ticker no-event control for each filing, excluding dates
-within a 10-calendar-day blackout window around known events.
+Daily prices are downloaded from Stooq first and Yahoo's public chart endpoint as a fallback.
+SPY is the market proxy for abnormal returns. The trading calendar is inferred from observed price
+tables rather than from an invented holiday file. Event label windows start from the first tradable
+session after public availability. If a filing is accepted after 16:00 ET, or on a non-trading
+day, the label starts on the next observed trading day.
+
+Features use only prices strictly before the event label start date. The eight numeric features
+are one-day return, five-day compounded return, 20-day compounded return, 20-day realized
+volatility, 20-day volume z-score, market return, market-relative return, and close-to-open return.
+Labels use future returns only as targets. We construct one deterministic same-ticker no-event
+control for each filing, excluding dates within a 10-calendar-day blackout window around known
+events. Control rows receive a zero event embedding and explicit control metadata; this makes the
+control objective clean for a first test, but it is also a limitation discussed below.
 
 \begin{table}[H]
 \centering
 \caption{Paper-scale public-data substrate.}
+\label{tab:substrate}
 \begin{tabular}{lr}
 \toprule
 Artifact & Count \\
@@ -166,15 +210,34 @@ Held-out test rows & 2,463 \\
 
 \section{Experiments}
 
-We compare five models: no-event dynamics only, text-only MLP, concat-fusion, CEBT without
-control losses, and full CEBT. The target vector contains five-trading-day abnormal return,
-volatility jump, and volume jump. We report iid row bootstrap intervals and clustered
-bootstrap sensitivity intervals by ticker and by label-start month.
+The paper-scale run uses \texttt{configs/paper\_v3.yaml} with seed 29. Rows with
+\(\tau_i \leq\) 2023-12-31 are training rows, rows with \(\tau_i \leq\) 2024-12-31 are validation
+rows, and later rows are held out. This gives 9,729 training rows, 2,280 validation rows, and
+2,463 held-out rows across 98 held-out tickers and 13 held-out label-start months. All models are
+trained for 15 epochs with AdamW, learning rate \(10^{-3}\), weight decay \(10^{-4}\), batch size
+64, and mixed precision on CUDA when available. No early stopping or hyperparameter search is used
+for the reported run.
+
+We compare five models: no-event dynamics only, text-only MLP, concat fusion, CEBT without
+control losses, and full CEBT. The no-event baseline sees \(X_i\) and metadata but no disclosure
+embedding. The text-only baseline sees \(e_i\) and metadata but no price history. Concat fusion
+uses the same no-event encoder as CEBT, then directly concatenates the pooled state, event
+embedding, and metadata without a stochastic bottleneck or additive residual constraint. CEBT
+without controls has the same architecture as full CEBT but sets \(\lambda_c=0\).
+
+Rank IC is Spearman correlation between predicted and realized abnormal return over held-out rows.
+The main rank-IC value is computed across all held-out rows; Figure~\ref{fig:heatmap} additionally
+shows monthly event-only rank IC buckets with at least eight disclosures. Confidence intervals use
+1,000 percentile bootstrap resamples. Row bootstraps sample held-out rows with replacement.
+Ticker-clustered and month-clustered intervals sample clusters with replacement and concatenate
+all rows in sampled clusters. Paired intervals resample aligned prediction rows and report the
+difference in the relevant metric.
 
 \begin{table}[H]
 \centering
 \caption{Held-out paper-scale results. MSE is over the three target dimensions. Rank-IC intervals
 shown here are ticker-clustered; month-clustered intervals are discussed in the text.}
+\label{tab:main-results}
 \small
 \begin{tabular}{lrrrr}
 \toprule
@@ -193,6 +256,7 @@ CEBT & 0.0660 & [0.0504, 0.0867] & \textbf{0.0463} & [0.0052, 0.0893] \\
 \centering
 \caption{Paired MSE comparisons against full CEBT. Positive values mean CEBT has lower MSE
 than the baseline.}
+\label{tab:paired-mse}
 \begin{tabular}{lrrr}
 \toprule
 Baseline & Baseline--CEBT MSE & 95\% CI & CEBT better? \\
@@ -209,6 +273,7 @@ Text-only & -0.00171 & [-0.00524, 0.00143] & No \\
 \centering
 \caption{Paired abnormal-return rank-IC comparisons against full CEBT. Positive values mean CEBT
 has higher rank IC than the baseline.}
+\label{tab:paired-rank}
 \small
 \begin{tabular}{lrrr}
 \toprule
@@ -228,6 +293,7 @@ Text-only & 0.0472 & [-0.0097, 0.1028] & No \\
 \caption{Forecast error with bootstrap confidence intervals. Concat fusion has the strongest
 point-estimate MSE; CEBT's advantage appears in rank ordering and residual discipline rather than
 raw multi-target regression error.}
+\label{fig:mse}
 \end{figure}
 
 \begin{figure}[H]
@@ -235,6 +301,7 @@ raw multi-target regression error.}
 \includegraphics[width=0.85\linewidth]{figures/rank_ic_comparison.png}
 \caption{Abnormal-return rank IC with bootstrap confidence intervals. Full CEBT is the only tested
 model whose interval is entirely above zero.}
+\label{fig:rank}
 \end{figure}
 
 \begin{figure}[H]
@@ -242,6 +309,7 @@ model whose interval is entirely above zero.}
 \includegraphics[width=0.92\linewidth]{figures/temporal_rank_ic_heatmap.png}
 \caption{Monthly event-ranking signal by model. The heatmap shows where rank signal appears and
 whether it is temporally concentrated or persistent across the held-out period.}
+\label{fig:heatmap}
 \end{figure}
 
 \begin{figure}[H]
@@ -250,6 +318,7 @@ whether it is temporally concentrated or persistent across the held-out period.}
 \caption{CEBT event-residual mosaic by company and month. Darker cells indicate months where the
 model routes more mass through the event residual rather than the no-event baseline; white cells
 indicate no held-out real 8-K events for that company-month.}
+\label{fig:mosaic}
 \end{figure}
 
 \begin{figure}[H]
@@ -258,6 +327,7 @@ indicate no held-out real 8-K events for that company-month.}
 \caption{Residual distribution for true 8-K events and matched no-event controls. The distributional
 view is more informative than a mean-only bar chart: controls concentrate near zero, while true
 events have a heavier residual tail.}
+\label{fig:residuals}
 \end{figure}
 
 \begin{figure}[H]
@@ -266,19 +336,23 @@ events have a heavier residual tail.}
 \caption{CEBT event-return phase portrait on held-out real disclosures. The density plot shows
 where predictions and realized abnormal returns concentrate, making the narrow prediction band and
 wide realized-return dispersion visible without plotting thousands of overlapping points.}
+\label{fig:phase}
 \end{figure}
 
 \section{Findings}
 
 \paragraph{CEBT is an event-ranking model, not the best raw regressor.}
-Concat fusion has the best point-estimate MSE, 0.0597, while full CEBT has MSE 0.0660. This
-matters: the architectural decomposition does not automatically minimize multi-target regression
-error. The evidence for CEBT is instead concentrated in rank ordering of event outcomes.
+As shown in Table~\ref{tab:main-results} and Figure~\ref{fig:mse}, concat fusion has the best
+point-estimate MSE, 0.0597, while full CEBT has MSE 0.0660. This matters: the architectural
+decomposition does not automatically minimize multi-target regression error. The evidence for CEBT
+is instead concentrated in rank ordering of event outcomes.
 
 \paragraph{The event-ranking signal survives clustered uncertainty checks.}
-Full CEBT has abnormal-return rank IC 0.0463. Its iid bootstrap interval is [0.0074, 0.0836],
-the ticker-clustered interval is [0.0052, 0.0893], and the month-clustered interval is
-[0.0112, 0.0768]. No other tested model has a positive clustered interval excluding zero.
+Full CEBT has abnormal-return rank IC 0.0463 in Table~\ref{tab:main-results}. Its iid bootstrap
+interval is [0.0074, 0.0836], the ticker-clustered interval is [0.0052, 0.0893], and the
+month-clustered interval is [0.0112, 0.0768]. No other tested model has a positive clustered
+interval excluding zero. Figure~\ref{fig:heatmap} shows that this signal is not a single
+company-month artifact, although it is still modest in magnitude.
 
 \paragraph{Paired rank comparisons separate CEBT from stronger baselines.}
 CEBT improves paired rank IC over concat fusion by 0.0645 with a 95\% paired interval
@@ -290,17 +364,52 @@ interval [-0.0202, 0.0595].
 The full CEBT model assigns mean absolute event residual 0.0313 to true events and 0.0103 to
 controls. The no-control variant assigns 0.0396 to true events and 0.0298 to controls. Thus, the
 control objective reduces spurious residual assignment to no-event dates by about 66\%, while
-preserving a roughly 3.0x event-to-control residual ratio.
+preserving a roughly 3.0x event-to-control residual ratio. Figures~\ref{fig:mosaic} and
+\ref{fig:residuals} show the same behavior visually: residual mass is sparse across
+company-months and shifted away from placebo rows.
+
+\section{Reproducibility}
+
+The reported run was produced with \texttt{configs/paper\_v3.yaml} and
+\texttt{configs/model/cebt\_small.yaml}. The pipeline order is:
+\begin{center}
+\small
+\begin{tabular}{lllll}
+\texttt{10\_build\_events} &
+\texttt{20\_download\_prices} &
+\texttt{30\_build\_features} &
+\texttt{60\_ablate} &
+\texttt{70\_make\_tables}
+\end{tabular}
+\end{center}
+The H200 run used PyTorch 2.11.0 with CUDA 12.8. The code stores raw SEC metadata, text hashes,
+price rows, feature metadata, model checkpoints, predictions, table CSVs, and generated figures.
+The automated tests check timestamp gating, after-hours label starts, feature leakage rejection,
+control construction, deterministic cached tensors, finite forward losses, and evaluation leakage
+guards. No paid data, closed-source model endpoint, or generated label is used for the main
+result.
 
 \section{Limitations}
 
 This is a first paper-scale run, not a final investment model. The text encoder is a deterministic
-open hashing baseline rather than a large pretrained financial encoder. The public price source is
-not CRSP, and labels use daily closes rather than intraday event windows. The universe is restricted
-to 8-K filings, and two configured tickers did not yield final usable event rows because of SEC
-retrieval failures during the build. The next version should test pretrained open embeddings,
-10-Q/10-K extensions, sector controls, and harder placebo controls where no-event dates receive
-unrelated historical disclosure text instead of a zero event embedding.
+open hashing baseline rather than a large pretrained financial encoder. Control rows use zero event
+embeddings and explicit control metadata, so residual suppression on controls is not yet a hard
+placebo-text test. The public price source is not CRSP, and labels use daily closes rather than
+intraday event windows. The universe is large-cap biased and may contain survivorship effects,
+ticker-history issues, and 8-K item-mix sensitivity. The experiment uses SPY-adjusted returns
+rather than richer factor-model residuals and excludes transaction costs. Two configured tickers
+did not yield final usable event rows because of SEC retrieval failures during the build. The
+counterfactual language should be read as architecture and regularization, not full causal
+identification. The next version should test pretrained open embeddings, 10-Q/10-K extensions,
+sector and factor controls, and harder placebo controls where no-event dates receive unrelated
+historical disclosure text instead of a zero event embedding.
+
+\section{Ethics and Use}
+
+This paper studies event representations using public filings and public daily prices. It is not a
+trading recommendation system, and the reported rank signal is too small and too coarsely measured
+to justify deployment. The release should include code, configs, and provenance metadata so that
+future users can audit leakage and reproduce or falsify the claims.
 
 \section{Conclusion}
 
