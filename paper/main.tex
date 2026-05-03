@@ -82,15 +82,20 @@ Our contributions are:
 
 \section{Related Work}
 
-CEBT is closest to causal and event-driven financial forecasting. CAMEF studies causal-augmented
-multi-modal financial forecasting \citep{chen2025camef}. Causal Transformer and G-Transformer
-estimate counterfactual outcomes in temporal settings \citep{melnychuk2022causaltransformer,
-feng2024gtransformer}. Time-series foundation models such as Chronos, Time-LLM, MOMENT, and
-Mamba improve sequence modeling capacity but do not isolate disclosure-induced residuals
-\citep{ansari2024chronos,jin2023timellm,wu2024moment,gu2023mamba}. Leakage-focused work such as
-Profit Mirage motivates strict temporal evaluation in financial agents \citep{li2025profitmirage}.
-Subliminal-learning results further motivate caution around hidden outcome signal in generated
-or compressed representations \citep{cloud2025subliminal}.
+CEBT is closest to causal and event-driven financial forecasting. Classical event-study methods
+estimate abnormal returns around public information releases \citep{fama1969adjustment,
+brown1985eventstudies,mackinlay1997eventstudies}; CEBT keeps this event-study grounding but
+learns a neural decomposition of baseline dynamics and disclosure residuals. CAMEF studies
+causal-augmented multi-modal financial forecasting \citep{chen2025camef}. Causal Transformer and
+G-Transformer estimate counterfactual outcomes in temporal settings \citep{melnychuk2022causaltransformer,
+feng2024gtransformer}. The architectural ingredients also connect to Transformers
+\citep{vaswani2017attention}, variational latent-variable models \citep{kingma2013autoencoding},
+and the information bottleneck principle \citep{tishby2000information}. Time-series foundation
+models such as Chronos, Time-LLM, MOMENT, and Mamba improve sequence modeling capacity but do not
+isolate disclosure-induced residuals \citep{ansari2024chronos,jin2023timellm,wu2024moment,
+gu2023mamba}. Leakage-focused work such as Profit Mirage motivates strict temporal evaluation in
+financial agents \citep{li2025profitmirage}. Subliminal-learning results further motivate caution
+around hidden outcome signal in generated or compressed representations \citep{cloud2025subliminal}.
 
 \section{Method}
 
