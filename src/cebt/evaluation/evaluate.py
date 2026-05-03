@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from cebt.evaluation.bootstrap import bootstrap_ci
+from cebt.evaluation.bootstrap import bootstrap_ci, clustered_bootstrap_ci
 from cebt.evaluation.leakage import validate_feature_metadata
 from cebt.evaluation.metrics import (
     abnormal_return_spread,
@@ -44,6 +44,17 @@ def evaluate_model(
     loader = DataLoader(dataset, batch_size=int(config.get("training", {}).get("batch_size", 32)))
     predictions, targets, deltas, is_event, dataset_indices = _predict(model, loader, device)
     metadata_rows = read_jsonl(metadata_path)
+    source_rows = [
+        metadata_rows[source_idx] if source_idx < len(metadata_rows) else {}
+        for source_idx in dataset_indices.tolist()
+    ]
+    paired_values = np.column_stack([predictions.reshape(predictions.shape[0], -1), targets])
+    rank_values = np.column_stack([predictions[:, 0], targets[:, 0]])
+    ticker_groups = np.asarray([row.get("ticker", "UNKNOWN") for row in source_rows], dtype=object)
+    month_groups = np.asarray(
+        [str(row.get("label_start_date", "UNKNOWN"))[:7] for row in source_rows],
+        dtype=object,
+    )
     metrics = {
         "rows": int(targets.shape[0]),
         "mse": mse(predictions, targets),
@@ -56,24 +67,51 @@ def evaluate_model(
         "mean_abs_event_delta_true_events": _masked_abs_mean(deltas, is_event >= 0.5),
         "mean_abs_event_delta_controls": _masked_abs_mean(deltas, is_event < 0.5),
         "mse_ci": bootstrap_ci(
-            np.column_stack([predictions.reshape(predictions.shape[0], -1), targets]),
-            lambda rows: mse(rows[:, : targets.shape[1]], rows[:, targets.shape[1] :]),
+            paired_values,
+            _mse_from_paired_rows(targets.shape[1]),
             n_boot=1000,
             seed=int(config.get("seed", 7)),
         ),
         "rank_ic_ci": bootstrap_ci(
-            np.column_stack([predictions[:, 0], targets[:, 0]]),
+            rank_values,
             lambda rows: rank_ic(rows[:, 0], rows[:, 1]) or 0.0,
             n_boot=1000,
             seed=int(config.get("seed", 7)),
+        ),
+        "mse_ci_ticker_cluster": clustered_bootstrap_ci(
+            paired_values,
+            ticker_groups,
+            _mse_from_paired_rows(targets.shape[1]),
+            n_boot=1000,
+            seed=int(config.get("seed", 7)) + 101,
+        ),
+        "rank_ic_ci_ticker_cluster": clustered_bootstrap_ci(
+            rank_values,
+            ticker_groups,
+            lambda rows: rank_ic(rows[:, 0], rows[:, 1]) or 0.0,
+            n_boot=1000,
+            seed=int(config.get("seed", 7)) + 102,
+        ),
+        "mse_ci_month_cluster": clustered_bootstrap_ci(
+            paired_values,
+            month_groups,
+            _mse_from_paired_rows(targets.shape[1]),
+            n_boot=1000,
+            seed=int(config.get("seed", 7)) + 103,
+        ),
+        "rank_ic_ci_month_cluster": clustered_bootstrap_ci(
+            rank_values,
+            month_groups,
+            lambda rows: rank_ic(rows[:, 0], rows[:, 1]) or 0.0,
+            n_boot=1000,
+            seed=int(config.get("seed", 7)) + 104,
         ),
     }
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     write_json(output / f"{checkpoint.get('model_name', 'model')}_eval_metrics.json", metrics)
     prediction_rows = []
-    for local_idx, source_idx in enumerate(dataset_indices.tolist()):
-        source_row = metadata_rows[source_idx] if source_idx < len(metadata_rows) else {}
+    for local_idx, source_row in enumerate(source_rows):
         prediction_rows.append(
             {
                 **source_row,
@@ -127,3 +165,10 @@ def _masked_abs_mean(values: np.ndarray, mask: np.ndarray) -> float | None:
     if not np.any(mask):
         return None
     return float(np.mean(np.abs(values[mask])))
+
+
+def _mse_from_paired_rows(target_dim: int):
+    def metric(rows: np.ndarray) -> float:
+        return mse(rows[:, :target_dim], rows[:, target_dim:])
+
+    return metric

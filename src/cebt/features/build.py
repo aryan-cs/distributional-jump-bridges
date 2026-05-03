@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from statistics import pstdev
 from typing import Any
 
 import numpy as np
 
-from cebt.data.prices import PriceBar, bar_by_date, close_returns
+from cebt.data.prices import PriceBar, close_returns
 from cebt.features.embeddings import HashingEmbedder, embed_texts_with_cache, zero_embedding
 from cebt.utils.hashing import stable_id
 from cebt.utils.io import write_json, write_jsonl
@@ -30,6 +30,18 @@ class FeatureBundle:
     split: np.ndarray
     event_ids: list[str]
     rows: list[dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class PriceContext:
+    bars: list[PriceBar]
+    calendar: TradingCalendar
+    bars_by_date: dict[date, PriceBar]
+    ticker_returns: dict[date, float]
+    volume_by_date: dict[date, float]
+    ordered_dates: list[date]
+    date_index: dict[date, int]
+    market_returns: dict[date, float]
 
 
 def build_feature_bundle(
@@ -68,26 +80,44 @@ def build_feature_bundle(
     is_event_rows: list[float] = []
     event_ids: list[str] = []
 
+    contexts = {
+        ticker: _price_context(bars, market_returns)
+        for ticker, bars in prices_by_ticker.items()
+        if bars
+    }
+
     real_event_starts: dict[str, set[date]] = {}
     for event in events:
         ticker = event["ticker"]
-        bars = prices_by_ticker.get(ticker, [])
-        calendar = TradingCalendar(tuple(bar.date for bar in bars))
-        start = calendar.event_start_date(event["available_at"])
+        context = contexts.get(ticker)
+        if context is None:
+            continue
+        start = context.calendar.event_start_date(event["available_at"])
         real_event_starts.setdefault(ticker, set()).add(start)
+
+    control_candidates = {
+        ticker: _control_candidates(
+            contexts[ticker],
+            starts,
+            pre_window,
+            horizon,
+            blackout,
+        )
+        for ticker, starts in real_event_starts.items()
+        if ticker in contexts
+    }
 
     for event in events:
         ticker = event["ticker"]
-        bars = prices_by_ticker.get(ticker, [])
-        if not bars:
+        context = contexts.get(ticker)
+        if context is None:
             continue
         sample = _build_sample(
             event=event,
             sample_id=event["event_id"],
             control_type="real_event",
             event_embedding=embeddings[event["event_id"]],
-            bars=bars,
-            market_returns=market_returns,
+            context=context,
             pre_window=pre_window,
             horizon=horizon,
             forced_start=None,
@@ -96,11 +126,7 @@ def build_feature_bundle(
             _append_sample(sample, rows, x_rows, e_rows, m_rows, y_rows, is_event_rows, event_ids)
         for control_start in _control_dates(
             event,
-            bars,
-            real_event_starts.get(ticker, set()),
-            pre_window,
-            horizon,
-            blackout,
+            control_candidates.get(ticker, []),
             controls_per_event,
         ):
             control_id = stable_id(event["event_id"], control_start.isoformat(), prefix="control")
@@ -109,8 +135,7 @@ def build_feature_bundle(
                 sample_id=control_id,
                 control_type="same_ticker_no_event",
                 event_embedding=zero_embedding(embedding_dim),
-                bars=bars,
-                market_returns=market_returns,
+                context=context,
                 pre_window=pre_window,
                 horizon=horizon,
                 forced_start=control_start,
@@ -193,30 +218,42 @@ def validate_feature_rows(rows: list[dict[str, Any]]) -> None:
             raise ValueError(f"Invalid label source for {row['sample_id']}")
 
 
+def _price_context(bars: list[PriceBar], market_returns: dict[date, float]) -> PriceContext:
+    ordered_bars = sorted(bars, key=lambda row: row.date)
+    ordered_dates = [bar.date for bar in ordered_bars]
+    return PriceContext(
+        bars=ordered_bars,
+        calendar=TradingCalendar(tuple(ordered_dates)),
+        bars_by_date={bar.date: bar for bar in ordered_bars},
+        ticker_returns=close_returns(ordered_bars),
+        volume_by_date={bar.date: bar.volume for bar in ordered_bars},
+        ordered_dates=ordered_dates,
+        date_index={day: idx for idx, day in enumerate(ordered_dates)},
+        market_returns=market_returns,
+    )
+
+
 def _build_sample(
     event: dict[str, Any],
     sample_id: str,
     control_type: str,
     event_embedding: np.ndarray,
-    bars: list[PriceBar],
-    market_returns: dict[date, float],
+    context: PriceContext,
     pre_window: int,
     horizon: int,
     forced_start: date | None,
 ) -> dict[str, Any] | None:
-    calendar = TradingCalendar(tuple(bar.date for bar in bars))
-    start = forced_start or calendar.event_start_date(event["available_at"])
-    end = calendar.event_end_date(start, horizon)
-    bars_by_date = bar_by_date(bars)
-    if start not in bars_by_date or end not in bars_by_date:
+    start = forced_start or context.calendar.event_start_date(event["available_at"])
+    end = context.calendar.event_end_date(start, horizon)
+    if start not in context.bars_by_date or end not in context.bars_by_date:
         return None
-    pre_dates = _pre_dates(calendar, start, pre_window)
-    if any(day not in bars_by_date for day in pre_dates):
+    pre_dates = _pre_dates(context.calendar, start, pre_window)
+    if any(day not in context.bars_by_date for day in pre_dates):
         return None
-    x_pre = _price_window_features(pre_dates, bars, market_returns)
+    x_pre = _price_window_features(pre_dates, context)
     if x_pre is None:
         return None
-    y = _label_vector(start, end, bars, market_returns, calendar)
+    y = _label_vector(start, end, context)
     if y is None:
         return None
     feature_max = pre_dates[-1]
@@ -283,33 +320,28 @@ def _pre_dates(calendar: TradingCalendar, start: date, count: int) -> list[date]
 
 def _price_window_features(
     pre_dates: list[date],
-    bars: list[PriceBar],
-    market_returns: dict[date, float],
+    context: PriceContext,
 ) -> np.ndarray | None:
-    bars_by_date = bar_by_date(bars)
-    ticker_returns = close_returns(bars)
     values = []
-    ordered_bars = sorted(bars, key=lambda row: row.date)
-    volume_by_date = {bar.date: bar.volume for bar in ordered_bars}
     for day in pre_dates:
-        if day not in ticker_returns or day not in bars_by_date:
+        if day not in context.ticker_returns or day not in context.bars_by_date:
             return None
-        trailing_5 = _trailing_values(ticker_returns, day, 5)
-        trailing_20 = _trailing_values(ticker_returns, day, 20)
-        trailing_volumes = _trailing_values(volume_by_date, day, 20)
+        trailing_5 = _trailing_values(context, context.ticker_returns, day, 5)
+        trailing_20 = _trailing_values(context, context.ticker_returns, day, 20)
+        trailing_volumes = _trailing_values(context, context.volume_by_date, day, 20)
         if not trailing_5 or len(trailing_20) < 2 or not trailing_volumes:
             return None
-        ret_1 = ticker_returns[day]
+        ret_1 = context.ticker_returns[day]
         ret_5 = float(np.prod([1.0 + value for value in trailing_5]) - 1.0)
         ret_20 = float(np.prod([1.0 + value for value in trailing_20]) - 1.0)
         realized_vol_20 = float(pstdev(trailing_20))
-        volume = volume_by_date[day]
+        volume = context.volume_by_date[day]
         volume_mean = float(np.mean(trailing_volumes))
         volume_std = float(np.std(trailing_volumes))
         volume_z = 0.0 if volume_std == 0 else float((volume - volume_mean) / volume_std)
-        market_ret = market_returns.get(day, 0.0)
+        market_ret = context.market_returns.get(day, 0.0)
         rel_ret = ret_1 - market_ret
-        close_to_open = bars_by_date[day].close / bars_by_date[day].open - 1.0
+        close_to_open = context.bars_by_date[day].close / context.bars_by_date[day].open - 1.0
         values.append(
             [ret_1, ret_5, ret_20, realized_vol_20, volume_z, market_ret, rel_ret, close_to_open]
         )
@@ -319,23 +351,38 @@ def _price_window_features(
 def _label_vector(
     start: date,
     end: date,
-    bars: list[PriceBar],
-    market_returns: dict[date, float],
-    calendar: TradingCalendar,
+    context: PriceContext,
 ) -> np.ndarray | None:
-    bars_by_date = bar_by_date(bars)
-    returns = close_returns(bars)
-    if start not in bars_by_date or end not in bars_by_date or bars_by_date[start].close <= 0:
+    if (
+        start not in context.bars_by_date
+        or end not in context.bars_by_date
+        or context.bars_by_date[start].close <= 0
+    ):
         return None
-    forward_return = bars_by_date[end].close / bars_by_date[start].close - 1.0
-    market_forward = _compound_market_return(start, end, market_returns, calendar)
-    abnormal = forward_return - market_forward
-    pre_returns = _trailing_values(returns, start, 20, include_current=False)
-    post_returns = _window_values(returns, start, end, calendar)
-    pre_volume = _trailing_values(
-        {bar.date: bar.volume for bar in bars}, start, 20, include_current=False
+    forward_return = context.bars_by_date[end].close / context.bars_by_date[start].close - 1.0
+    market_forward = _compound_market_return(
+        start,
+        end,
+        context.market_returns,
+        context.calendar,
     )
-    post_volume = _window_values({bar.date: bar.volume for bar in bars}, start, end, calendar)
+    abnormal = forward_return - market_forward
+    pre_returns = _trailing_values(
+        context,
+        context.ticker_returns,
+        start,
+        20,
+        include_current=False,
+    )
+    post_returns = _window_values(context.ticker_returns, start, end, context.calendar)
+    pre_volume = _trailing_values(
+        context,
+        context.volume_by_date,
+        start,
+        20,
+        include_current=False,
+    )
+    post_volume = _window_values(context.volume_by_date, start, end, context.calendar)
     if len(pre_returns) < 2 or len(post_returns) < 2 or not pre_volume or not post_volume:
         return None
     volatility_jump = float(pstdev(post_returns) - pstdev(pre_returns))
@@ -362,27 +409,37 @@ def _metadata(event: dict[str, Any], control_type: str, start: date) -> np.ndarr
     )
 
 
-def _control_dates(
-    event: dict[str, Any],
-    bars: list[PriceBar],
+def _control_candidates(
+    context: PriceContext,
     real_event_starts: set[date],
     pre_window: int,
     horizon: int,
     blackout: int,
-    count: int,
 ) -> list[date]:
-    calendar = TradingCalendar(tuple(bar.date for bar in bars))
+    blocked = {
+        event_day + timedelta(days=offset)
+        for event_day in real_event_starts
+        for offset in range(-blackout, blackout + 1)
+    }
     candidates = []
-    traded = [bar.date for bar in bars]
+    traded = context.ordered_dates
     for day in traded[pre_window + 25 : -horizon - 2]:
-        if any(abs((day - event_day).days) <= blackout for event_day in real_event_starts):
+        if day in blocked:
             continue
         try:
-            end = calendar.event_end_date(day, horizon)
+            end = context.calendar.event_end_date(day, horizon)
         except ValueError:
             continue
-        if end in set(traded):
+        if end in context.bars_by_date:
             candidates.append(day)
+    return candidates
+
+
+def _control_dates(
+    event: dict[str, Any],
+    candidates: list[date],
+    count: int,
+) -> list[date]:
     if not candidates:
         return []
     offset = int(stable_id(event["event_id"], prefix="offset").split(":")[1], 16) % len(candidates)
@@ -391,19 +448,22 @@ def _control_dates(
 
 
 def _trailing_values(
+    context: PriceContext,
     values_by_date: dict[date, float],
     day: date,
     count: int,
     include_current: bool = True,
 ) -> list[float]:
-    dates = sorted(values_by_date)
-    try:
-        idx = dates.index(day)
-    except ValueError:
+    idx = context.date_index.get(day)
+    if idx is None:
         return []
     end = idx + 1 if include_current else idx
     start = max(0, end - count)
-    return [values_by_date[value] for value in dates[start:end]]
+    return [
+        values_by_date[value]
+        for value in context.ordered_dates[start:end]
+        if value in values_by_date
+    ]
 
 
 def _window_values(

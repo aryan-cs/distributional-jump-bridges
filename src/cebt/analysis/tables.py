@@ -23,10 +23,12 @@ def make_tables(run_dir: str | Path) -> dict:
                 metric_rows.append({"model": model, "metric": key, "value": value})
     write_csv(root / "table_eval_metrics.csv", metric_rows)
     paired_rows = make_paired_comparison_table(root)
+    rank_rows = make_paired_rank_ic_table(root)
     residual_rows = make_residual_table(root)
     summary = {
         "metric_rows": len(metric_rows),
         "paired_rows": len(paired_rows),
+        "paired_rank_rows": len(rank_rows),
         "residual_rows": len(residual_rows),
         "source_dir": str(root),
     }
@@ -67,6 +69,48 @@ def make_paired_comparison_table(root: Path, reference_model: str = "cebt") -> l
             }
         )
     write_csv(root / "table_paired_mse_comparisons.csv", rows)
+    return rows
+
+
+def make_paired_rank_ic_table(root: Path, reference_model: str = "cebt") -> list[dict]:
+    predictions = _load_predictions(root)
+    if reference_model not in predictions:
+        return []
+    reference = predictions[reference_model]
+    rows = []
+    for model, model_rows in sorted(predictions.items()):
+        if model == reference_model:
+            continue
+        joined = _join_prediction_rows(reference, model_rows)
+        if not joined:
+            continue
+        reference_pairs = np.asarray(
+            [[item["reference_prediction"], item["target_abnormal_return"]] for item in joined],
+            dtype=float,
+        )
+        model_pairs = np.asarray(
+            [[item["model_prediction"], item["target_abnormal_return"]] for item in joined],
+            dtype=float,
+        )
+        improvement = paired_bootstrap_ci(
+            reference_pairs,
+            model_pairs,
+            _rank_ic_from_prediction_rows,
+            n_boot=2000,
+            seed=29,
+        )
+        rows.append(
+            {
+                "reference_model": reference_model,
+                "baseline_model": model,
+                "paired_rows": len(joined),
+                "reference_minus_baseline_rank_ic": improvement["mean"],
+                "ci_lo": improvement["lo"],
+                "ci_hi": improvement["hi"],
+                "reference_better": improvement["lo"] > 0.0,
+            }
+        )
+    write_csv(root / "table_paired_rank_ic_comparisons.csv", rows)
     return rows
 
 
@@ -113,6 +157,9 @@ def _join_prediction_rows(reference: list[dict], candidate: list[dict]) -> list[
                 "sample_id": sample_id,
                 "reference_mse": _row_mse(ref_row),
                 "model_mse": _row_mse(row),
+                "reference_prediction": ref_row["prediction_abnormal_return"],
+                "model_prediction": row["prediction_abnormal_return"],
+                "target_abnormal_return": ref_row["target_abnormal_return"],
             }
         )
     return joined
@@ -136,3 +183,9 @@ def _row_mse(row: dict) -> float:
         dtype=float,
     )
     return float(np.mean((pred - target) ** 2))
+
+
+def _rank_ic_from_prediction_rows(rows: np.ndarray) -> float:
+    from cebt.evaluation.metrics import rank_ic
+
+    return rank_ic(rows[:, 0], rows[:, 1]) or 0.0

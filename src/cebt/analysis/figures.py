@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 
+from cebt.evaluation.metrics import rank_ic
 from cebt.utils.io import read_json, read_jsonl, write_json
 
 
@@ -23,6 +25,16 @@ def make_figures(run_dir: str | Path) -> dict:
         outputs["event_delta_controls"] = str(_plot_event_delta(metrics, figure_dir))
     if predictions:
         outputs["prediction_scatter"] = str(_plot_prediction_scatter(predictions, figure_dir))
+        outputs["prediction_phase_portrait"] = str(
+            _plot_prediction_phase_portrait(predictions, figure_dir)
+        )
+        outputs["temporal_rank_ic_heatmap"] = str(
+            _plot_temporal_rank_ic_heatmap(predictions, figure_dir)
+        )
+        outputs["event_residual_mosaic"] = str(_plot_event_residual_mosaic(predictions, figure_dir))
+        outputs["residual_distribution"] = str(
+            _plot_residual_distribution(predictions, figure_dir)
+        )
     write_json(root / "figures_summary.json", outputs)
     return outputs
 
@@ -213,3 +225,153 @@ def _plot_prediction_scatter(predictions: list[dict], figure_dir: Path) -> Path:
     plt.savefig(path, dpi=200)
     plt.close()
     return path
+
+
+def _plot_prediction_phase_portrait(predictions: list[dict], figure_dir: Path) -> Path:
+    cebt_rows = _event_rows([row for row in predictions if row.get("model") == "cebt"])
+    rows = cebt_rows or _event_rows(predictions) or predictions
+    x = np.asarray([row["prediction_abnormal_return"] for row in rows], dtype=float)
+    y = np.asarray([row["target_abnormal_return"] for row in rows], dtype=float)
+    path = figure_dir / "prediction_phase_portrait.png"
+    plt.figure(figsize=(6.0, 5.2))
+    plt.hexbin(x, y, gridsize=30, mincnt=1, cmap="viridis")
+    plt.colorbar(label="Held-out events per cell")
+    plt.axhline(0.0, color="white", linewidth=1.0, alpha=0.9)
+    plt.axvline(0.0, color="white", linewidth=1.0, alpha=0.9)
+    plt.xlabel("Predicted abnormal return")
+    plt.ylabel("Realized abnormal return")
+    plt.title("CEBT Event-Return Phase Portrait")
+    plt.tight_layout()
+    plt.savefig(path, dpi=220)
+    plt.close()
+    return path
+
+
+def _plot_temporal_rank_ic_heatmap(predictions: list[dict], figure_dir: Path) -> Path:
+    rows = _event_rows(predictions)
+    models = _model_order({row["model"]: {} for row in rows if row.get("model")})
+    months = sorted({str(row.get("label_start_date", ""))[:7] for row in rows})
+    months = [month for month in months if len(month) == 7]
+    matrix = np.full((len(models), len(months)), np.nan, dtype=float)
+    for row_idx, model in enumerate(models):
+        model_rows = [row for row in rows if row.get("model") == model]
+        for col_idx, month in enumerate(months):
+            bucket = [
+                row
+                for row in model_rows
+                if str(row.get("label_start_date", "")).startswith(month)
+            ]
+            if len(bucket) >= 8:
+                matrix[row_idx, col_idx] = rank_ic(
+                    np.asarray([row["prediction_abnormal_return"] for row in bucket], dtype=float),
+                    np.asarray([row["target_abnormal_return"] for row in bucket], dtype=float),
+                ) or 0.0
+    path = figure_dir / "temporal_rank_ic_heatmap.png"
+    width = max(8.0, 0.42 * len(months))
+    plt.figure(figsize=(width, 3.8))
+    im = plt.imshow(matrix, aspect="auto", cmap="RdBu", vmin=-0.35, vmax=0.35)
+    plt.colorbar(im, label="Monthly event rank IC")
+    plt.yticks(range(len(models)), [_display_name(model).replace("\n", " ") for model in models])
+    plt.xticks(range(len(months)), months, rotation=45, ha="right")
+    plt.title("Where Event Ranking Signal Appears Over Time")
+    plt.tight_layout()
+    plt.savefig(path, dpi=220)
+    plt.close()
+    return path
+
+
+def _plot_event_residual_mosaic(predictions: list[dict], figure_dir: Path) -> Path:
+    rows = _event_rows([row for row in predictions if row.get("model") == "cebt"])
+    tickers = _top_values([row.get("ticker", "UNKNOWN") for row in rows], limit=28)
+    months = sorted({str(row.get("label_start_date", ""))[:7] for row in rows})
+    months = [month for month in months if len(month) == 7]
+    matrix = np.full((len(tickers), len(months)), np.nan, dtype=float)
+    for row_idx, ticker in enumerate(tickers):
+        ticker_rows = [row for row in rows if row.get("ticker", "UNKNOWN") == ticker]
+        for col_idx, month in enumerate(months):
+            values = [
+                float(row["event_delta_abs_mean"])
+                for row in ticker_rows
+                if str(row.get("label_start_date", "")).startswith(month)
+            ]
+            if values:
+                matrix[row_idx, col_idx] = float(np.mean(values))
+    path = figure_dir / "event_residual_mosaic.png"
+    width = max(8.0, 0.42 * len(months))
+    height = max(5.0, 0.18 * len(tickers))
+    plt.figure(figsize=(width, height))
+    masked = np.ma.masked_invalid(matrix)
+    im = plt.imshow(masked, aspect="auto", cmap="magma")
+    plt.colorbar(im, label="Mean absolute CEBT event residual")
+    plt.yticks(range(len(tickers)), tickers)
+    plt.xticks(range(len(months)), months, rotation=45, ha="right")
+    plt.title("Disclosure Residual Mosaic by Company and Month")
+    plt.tight_layout()
+    plt.savefig(path, dpi=220)
+    plt.close()
+    return path
+
+
+def _plot_residual_distribution(predictions: list[dict], figure_dir: Path) -> Path:
+    rows = [row for row in predictions if row.get("model") == "cebt"]
+    true_values = np.asarray(
+        [
+            row["event_delta_abs_mean"]
+            for row in rows
+            if row.get("control_type") == "real_event"
+        ],
+        dtype=float,
+    )
+    control_values = np.asarray(
+        [
+            row["event_delta_abs_mean"]
+            for row in rows
+            if row.get("control_type") != "real_event"
+        ],
+        dtype=float,
+    )
+    path = figure_dir / "residual_distribution.png"
+    plt.figure(figsize=(7.0, 4.2))
+    bins = np.linspace(0.0, max(_safe_max(true_values), _safe_max(control_values), 1e-6), 36)
+    plt.hist(
+        true_values,
+        bins=bins,
+        density=True,
+        alpha=0.65,
+        label="True 8-K events",
+        color="#2a9d8f",
+    )
+    plt.hist(
+        control_values,
+        bins=bins,
+        density=True,
+        alpha=0.55,
+        label="Matched no-event controls",
+        color="#e76f51",
+    )
+    plt.xlabel("Absolute event residual")
+    plt.ylabel("Density")
+    plt.title("CEBT Residual Mass Shifts Away From No-Event Controls")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path, dpi=220)
+    plt.close()
+    return path
+
+
+def _event_rows(rows: list[dict]) -> list[dict]:
+    return [row for row in rows if row.get("control_type") == "real_event"]
+
+
+def _top_values(values: list[str], limit: int) -> list[str]:
+    counts: dict[str, int] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    return [value for value, _ in ranked[:limit]]
+
+
+def _safe_max(values: np.ndarray) -> float:
+    if values.size == 0:
+        return 0.0
+    return float(np.nanmax(values))

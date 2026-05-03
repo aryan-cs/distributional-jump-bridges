@@ -29,6 +29,35 @@ def bootstrap_ci(
     }
 
 
+def clustered_bootstrap_ci(
+    values: np.ndarray,
+    group_ids: np.ndarray,
+    metric_fn: Callable[[np.ndarray], float],
+    n_boot: int = 1000,
+    seed: int = 7,
+    alpha: float = 0.05,
+) -> dict[str, float]:
+    if values.shape[0] == 0 or values.shape[0] != group_ids.shape[0]:
+        return {"mean": float("nan"), "lo": float("nan"), "hi": float("nan")}
+    groups = np.asarray(sorted(set(group_ids.tolist())), dtype=object)
+    if groups.shape[0] == 0:
+        return {"mean": float("nan"), "lo": float("nan"), "hi": float("nan")}
+    group_to_indices = {group: np.flatnonzero(group_ids == group) for group in groups}
+    rng = np.random.default_rng(seed)
+    estimates = []
+    for _ in range(n_boot):
+        sampled_groups = rng.choice(groups, size=groups.shape[0], replace=True)
+        indices = np.concatenate([group_to_indices[group] for group in sampled_groups])
+        estimates.append(metric_fn(values[indices]))
+    ordered = np.asarray(estimates, dtype=float)
+    return {
+        "mean": float(metric_fn(values)),
+        "lo": float(np.quantile(ordered, alpha / 2.0)),
+        "hi": float(np.quantile(ordered, 1.0 - alpha / 2.0)),
+        "groups": int(groups.shape[0]),
+    }
+
+
 def paired_bootstrap_ci(
     left: np.ndarray,
     right: np.ndarray,
