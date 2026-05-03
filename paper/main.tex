@@ -41,25 +41,24 @@ Counterfactual Event Bottleneck Transformer (CEBT), an architecture that predict
 baseline from pre-event market history and routes disclosure information through a compact
 stochastic bottleneck that predicts an event-induced residual. The model is trained with matched
 same-ticker no-event controls, a residual-suppression loss for controls, and strict temporal
-feature gates. On a real public-data experiment covering 7,236 SEC 8-K events from 98 usable
-large U.S. firms between 2020 and 2025, full CEBT does not dominate every baseline on raw
-regression error. Its evidence is narrower but more interesting: CEBT is the only tested model
-with positive held-out abnormal-return rank IC under iid, ticker-clustered, and month-clustered
-bootstrap intervals. In paired rank-IC comparisons, CEBT significantly improves over no-event
-dynamics and concat fusion, while its improvement over the no-control CEBT ablation is positive
-but not statistically resolved. CEBT also suppresses residual magnitude assigned to no-event
-controls. The main claim is not that CEBT is a deployable trading system, but that an explicit
-event bottleneck and no-event control objective produce a more temporally disciplined
-event-residual representation.
+feature gates. In a public-data experiment covering 7,236 SEC 8-K events from 98 usable
+large U.S. firms between 2020 and 2025, full CEBT does not dominate every baseline on regression
+error. Its main empirical advantage is event ranking: CEBT is the only tested model with positive
+held-out abnormal-return rank IC under iid, ticker-clustered, and month-clustered bootstrap
+intervals. In paired rank-IC comparisons, CEBT significantly improves over no-event dynamics and
+concat fusion, while its improvement over the no-control CEBT ablation is positive but not
+statistically resolved. CEBT also suppresses residual magnitude assigned to no-event controls.
+These results support explicit event bottlenecks as a mechanism for learning temporally disciplined
+disclosure-residual representations.
 \end{abstract}
 
 \section{Introduction}
 
-Disclosure events are difficult modeling targets because market movement after a filing is
-not caused only by the filing. A stock's subsequent return reflects market drift, sector movement,
+Disclosure events are difficult modeling targets because price movement after a filing is not
+determined only by the filing. A stock's subsequent return reflects market drift, sector movement,
 liquidity, firm-specific momentum, and the information content of the disclosure itself. Standard
-fusion models mix these sources into one hidden representation, making it hard to tell whether
-the model learned an event effect or simply reproduced ordinary dynamics.
+fusion models mix these sources into one hidden representation, making it difficult to determine
+whether the model has learned an event effect or reproduced ordinary market dynamics.
 
 We introduce CEBT, an event modeling architecture that decomposes the forecast into
 \[
@@ -67,11 +66,11 @@ We introduce CEBT, an event modeling architecture that decomposes the forecast i
 \]
 where \(f_{\mathrm{no\ event}}\) is learned from pre-event numeric history and \(z_e\) is a compact
 stochastic disclosure bottleneck. The bottleneck is trained with matched no-event controls:
-dates for the same ticker that are far from known SEC 8-K events. For controls, the model is
+dates for the same ticker that are far from known SEC 8-K events. For control rows, the model is
 penalized when it assigns a large event residual. This makes the residual interpretable as a
 candidate event-specific increment rather than an unconstrained shortcut.
 
-Our contributions are:
+The contributions are:
 \begin{enumerate}
     \item A no-event-plus-residual neural architecture for financial disclosure modeling.
     \item A stochastic event bottleneck trained with matched no-event controls.
@@ -135,7 +134,7 @@ The event module embeds the disclosure text and metadata, then parameterizes a G
 \(q_\phi(z_i \mid e_i,m_i)=\mathcal{N}(\mu_i,\mathrm{diag}(\exp(\ell_i)))\). During training,
 \(z_i=\mu_i+\epsilon\exp(\ell_i/2)\), \(\epsilon\sim\mathcal{N}(0,I)\); at evaluation, we use
 \(\mu_i\). The prior is \(p(z)=\mathcal{N}(0,I)\). The latent dimension is intentionally small:
-the paper-scale model uses eight latent coordinates, hidden width 96, two Transformer encoder
+the main model uses eight latent coordinates, hidden width 96, two Transformer encoder
 layers, four attention heads, and dropout 0.10. We add a KL term and sparsity term so the event
 representation cannot behave like an unrestricted text embedding.
 
@@ -163,11 +162,11 @@ latent sparsity, and a small residual-variance consistency penalty:
 For the paper-scale run, \(\lambda_y=1.0\), \(\lambda_c=0.25\), \(\lambda_{kl}=0.01\),
 \(\lambda_s=0.001\), and \(\lambda_v=0.05\). The control penalty is averaged over no-event rows
 in each batch. The consistency term is the batch variance of the residual output and is included
-only as a small stabilizer, not as the main source of the result.
+as a small stabilizer rather than as the primary source of supervision.
 
 \section{Data and Leakage Controls}
 
-We build a public-data experiment from SEC EDGAR APIs \citep{secapi}. The paper-scale run covers
+We build a public-data experiment from SEC EDGAR APIs \citep{secapi}. The main sample covers
 98 usable large U.S. firms, SEC 8-K filings from 2020--2025, and daily public prices. Tickers are
 mapped to CIKs through the SEC company-tickers file. Filings are read from SEC submissions JSON,
 including archived submissions, using the SEC \texttt{acceptanceDateTime} field and the primary
@@ -178,9 +177,9 @@ URL, text hash, and local provenance.
 
 Daily prices are downloaded from Stooq first and Yahoo's public chart endpoint as a fallback.
 SPY is the market proxy for abnormal returns. The trading calendar is inferred from observed price
-tables rather than from an invented holiday file. Event label windows start from the first tradable
-session after public availability. If a filing is accepted after 16:00 ET, or on a non-trading
-day, the label starts on the next observed trading day.
+tables. Event label windows start from the first tradable session after public availability. If a
+filing is accepted after 16:00 ET, or on a non-trading day, the label starts on the next observed
+trading day.
 
 Features use only prices strictly before the event label start date. The eight numeric features
 are one-day return, five-day compounded return, 20-day compounded return, 20-day realized
@@ -188,11 +187,12 @@ volatility, 20-day volume z-score, market return, market-relative return, and cl
 Labels use future returns only as targets. We construct one deterministic same-ticker no-event
 control for each filing, excluding dates within a 10-calendar-day blackout window around known
 events. Control rows receive a zero event embedding and explicit control metadata; this makes the
-control objective clean for a first test, but it is also a limitation discussed below.
+control objective identifiable in the architecture, but it also weakens the placebo setting
+relative to controls paired with nonzero irrelevant disclosure text.
 
 \begin{table}[H]
 \centering
-\caption{Paper-scale public-data substrate.}
+\caption{Main public-data sample.}
 \label{tab:substrate}
 \begin{tabular}{lr}
 \toprule
@@ -210,13 +210,13 @@ Held-out test rows & 2,463 \\
 
 \section{Experiments}
 
-The paper-scale run uses \texttt{configs/paper\_v3.yaml} with seed 29. Rows with
+The experimental protocol uses a fixed configuration and seed 29. Rows with
 \(\tau_i \leq\) 2023-12-31 are training rows, rows with \(\tau_i \leq\) 2024-12-31 are validation
 rows, and later rows are held out. This gives 9,729 training rows, 2,280 validation rows, and
 2,463 held-out rows across 98 held-out tickers and 13 held-out label-start months. All models are
 trained for 15 epochs with AdamW, learning rate \(10^{-3}\), weight decay \(10^{-4}\), batch size
-64, and mixed precision on CUDA when available. No early stopping or hyperparameter search is used
-for the reported run.
+64, and the same chronological split. No early stopping or hyperparameter search is used for the
+reported experiment.
 
 We compare five models: no-event dynamics only, text-only MLP, concat fusion, CEBT without
 control losses, and full CEBT. The no-event baseline sees \(X_i\) and metadata but no disclosure
@@ -235,7 +235,7 @@ difference in the relevant metric.
 
 \begin{table}[H]
 \centering
-\caption{Held-out paper-scale results. MSE is over the three target dimensions. Rank-IC intervals
+\caption{Held-out results. MSE is over the three target dimensions. Rank-IC intervals
 shown here are ticker-clustered; month-clustered intervals are discussed in the text.}
 \label{tab:main-results}
 \small
@@ -341,11 +341,11 @@ wide realized-return dispersion visible without plotting thousands of overlappin
 
 \section{Findings}
 
-\paragraph{CEBT is an event-ranking model, not the best raw regressor.}
+\paragraph{Predictive ranking and regression error differ.}
 As shown in Table~\ref{tab:main-results} and Figure~\ref{fig:mse}, concat fusion has the best
-point-estimate MSE, 0.0597, while full CEBT has MSE 0.0660. This matters: the architectural
-decomposition does not automatically minimize multi-target regression error. The evidence for CEBT
-is instead concentrated in rank ordering of event outcomes.
+point-estimate MSE, 0.0597, while full CEBT has MSE 0.0660. The architectural decomposition
+therefore does not automatically minimize multi-target regression error. The empirical support for
+CEBT is concentrated in rank ordering of event outcomes.
 
 \paragraph{The event-ranking signal survives clustered uncertainty checks.}
 Full CEBT has abnormal-return rank IC 0.0463 in Table~\ref{tab:main-results}. Its iid bootstrap
@@ -370,54 +370,43 @@ company-months and shifted away from placebo rows.
 
 \section{Reproducibility}
 
-The reported run was produced with \texttt{configs/paper\_v3.yaml} and
-\texttt{configs/model/cebt\_small.yaml}. The pipeline order is:
-\begin{center}
-\small
-\begin{tabular}{lllll}
-\texttt{10\_build\_events} &
-\texttt{20\_download\_prices} &
-\texttt{30\_build\_features} &
-\texttt{60\_ablate} &
-\texttt{70\_make\_tables}
-\end{tabular}
-\end{center}
-The H200 run used PyTorch 2.11.0 with CUDA 12.8. The code stores raw SEC metadata, text hashes,
-price rows, feature metadata, model checkpoints, predictions, table CSVs, and generated figures.
-The automated tests check timestamp gating, after-hours label starts, feature leakage rejection,
-control construction, deterministic cached tensors, finite forward losses, and evaluation leakage
-guards. No paid data, closed-source model endpoint, or generated label is used for the main
-result.
+The accompanying artifact records the exact configuration, random seed, processed event metadata,
+text hashes, price rows, feature metadata, model checkpoints, predictions, table CSVs, and figure
+outputs used for the reported results. The implementation includes tests for timestamp gating,
+after-hours label starts, feature leakage rejection, control construction, deterministic cached
+tensors, finite forward losses, and evaluation leakage guards. Labels are computed only from
+observed future price windows and are never included in model inputs.
 
 \section{Limitations}
 
-This is a first paper-scale run, not a final investment model. The text encoder is a deterministic
-open hashing baseline rather than a large pretrained financial encoder. Control rows use zero event
-embeddings and explicit control metadata, so residual suppression on controls is not yet a hard
-placebo-text test. The public price source is not CRSP, and labels use daily closes rather than
-intraday event windows. The universe is large-cap biased and may contain survivorship effects,
-ticker-history issues, and 8-K item-mix sensitivity. The experiment uses SPY-adjusted returns
-rather than richer factor-model residuals and excludes transaction costs. Two configured tickers
-did not yield final usable event rows because of SEC retrieval failures during the build. The
-counterfactual language should be read as architecture and regularization, not full causal
-identification. The next version should test pretrained open embeddings, 10-Q/10-K extensions,
-sector and factor controls, and harder placebo controls where no-event dates receive unrelated
-historical disclosure text instead of a zero event embedding.
+The study has several limitations. The text encoder is a deterministic open hashing baseline rather
+than a large pretrained financial encoder. Control rows use zero event embeddings and explicit
+control metadata, so residual suppression on controls is not yet a stringent placebo-text test. The
+public price source is not CRSP, and labels use daily closes rather than intraday event windows.
+The universe is large-cap biased and may contain survivorship effects, ticker-history issues, and
+8-K item-mix sensitivity. The experiment uses SPY-adjusted returns rather than richer factor-model
+residuals and excludes transaction costs. Two configured tickers did not yield final usable event
+rows because of SEC retrieval failures during data collection. The counterfactual interpretation is
+architectural and predictive rather than a claim of structural causal identification. Future work
+should test pretrained open embeddings, 10-Q/10-K extensions, sector and factor controls, and
+stricter placebo controls where no-event dates receive unrelated historical disclosure text instead
+of a zero event embedding.
 
 \section{Ethics and Use}
 
-This paper studies event representations using public filings and public daily prices. It is not a
-trading recommendation system, and the reported rank signal is too small and too coarsely measured
-to justify deployment. The release should include code, configs, and provenance metadata so that
-future users can audit leakage and reproduce or falsify the claims.
+This paper studies event representations using public filings and public daily prices. The results
+do not constitute trading recommendations, and the reported rank signal is too small and too
+coarsely measured to justify deployment. The artifact is intended to support leakage auditing and
+independent reproduction of the empirical claims.
 
 \section{Conclusion}
 
 CEBT reframes event-driven financial modeling as a decomposition problem: ordinary market dynamics
-plus a disclosure-induced residual. In a real public-data experiment, CEBT does not beat concat
-fusion on raw MSE, but it produces the strongest abnormal-return rank ordering and remains positive
-under ticker- and month-clustered uncertainty checks. The result supports CEBT as a promising
-architecture for studying event-specific effects under strict temporal information boundaries.
+plus a disclosure-induced residual. In a public-data experiment, CEBT does not beat concat fusion
+on MSE, but it produces the strongest abnormal-return rank ordering and remains positive under
+ticker- and month-clustered uncertainty checks. These findings support event bottlenecks as a
+useful architectural mechanism for studying event-specific effects under strict temporal
+information boundaries.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

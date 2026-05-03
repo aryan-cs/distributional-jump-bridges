@@ -15,6 +15,8 @@ class LossWeights:
     kl_weight: float = 0.01
     sparsity_weight: float = 0.001
     consistency_weight: float = 0.05
+    rank_weight: float = 0.0
+    rank_temperature: float = 0.02
 
     @classmethod
     def from_dict(cls, row: dict) -> LossWeights:
@@ -44,12 +46,19 @@ def cebt_loss(
         consistency = torch.mean(torch.var(event_delta, dim=0))
     else:
         consistency = event_delta.new_tensor(0.0)
+    rank = pairwise_rank_loss(
+        outputs["prediction"][:, 0],
+        targets[:, 0],
+        is_event,
+        temperature=weights.rank_temperature,
+    )
     total = (
         weights.supervised_weight * supervised
         + weights.control_delta_weight * control_delta
         + weights.kl_weight * kl
         + weights.sparsity_weight * sparsity
         + weights.consistency_weight * consistency
+        + weights.rank_weight * rank
     )
     metrics = {
         "loss": float(total.detach().cpu()),
@@ -58,5 +67,30 @@ def cebt_loss(
         "kl": float(kl.detach().cpu()),
         "sparsity": float(sparsity.detach().cpu()),
         "consistency": float(consistency.detach().cpu()),
+        "rank": float(rank.detach().cpu()),
     }
     return total, metrics
+
+
+def pairwise_rank_loss(
+    scores: torch.Tensor,
+    targets: torch.Tensor,
+    is_event: torch.Tensor,
+    temperature: float = 0.02,
+) -> torch.Tensor:
+    """Pairwise logistic ranking loss over real disclosure events in a batch."""
+
+    event_mask = is_event >= 0.5
+    event_scores = scores[event_mask]
+    event_targets = targets[event_mask]
+    if event_scores.shape[0] < 2:
+        return scores.new_tensor(0.0)
+    target_diff = event_targets.unsqueeze(0) - event_targets.unsqueeze(1)
+    score_diff = event_scores.unsqueeze(0) - event_scores.unsqueeze(1)
+    pair_mask = torch.triu(torch.ones_like(target_diff, dtype=torch.bool), diagonal=1)
+    pair_mask = pair_mask & (torch.abs(target_diff) > 1e-8)
+    if not torch.any(pair_mask):
+        return scores.new_tensor(0.0)
+    direction = torch.sign(target_diff[pair_mask])
+    scaled_margin = direction * score_diff[pair_mask] / max(float(temperature), 1e-6)
+    return F.softplus(-scaled_margin).mean()
