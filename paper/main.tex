@@ -41,13 +41,15 @@ Counterfactual Event Bottleneck Transformer (CEBT), an architecture that predict
 baseline from pre-event market history and routes disclosure information through a compact
 stochastic bottleneck that predicts an event-induced residual. The model is trained with matched
 same-ticker no-event controls, a residual-suppression loss for controls, and strict temporal
-feature gates. On a real public-data experiment covering 2,971 SEC 8-K events from 50 large
-U.S. firms between 2021 and 2025, full CEBT is competitive on regression error, significantly
-improves paired MSE over the same architecture without control losses, and is the only tested
-model with a positive abnormal-return rank IC whose bootstrap interval excludes zero. CEBT also
-substantially reduces residual magnitude assigned to no-event controls. The main claim is not
-that CEBT is a deployable trading system, but that an explicit event bottleneck and no-event
-control objective produce a more temporally disciplined event-residual representation.
+feature gates. On a real public-data experiment covering 7,236 SEC 8-K events from 98 usable
+large U.S. firms between 2020 and 2025, full CEBT does not dominate every baseline on raw
+regression error, but it is the only tested model with positive abnormal-return rank IC under
+iid, ticker-clustered, and month-clustered bootstrap intervals. In paired rank-IC comparisons,
+CEBT significantly improves over no-event dynamics and concat fusion, while its improvement over
+the no-control CEBT ablation is positive but not statistically resolved. CEBT also suppresses
+residual magnitude assigned to no-event controls. The main claim is not that CEBT is a deployable
+trading system, but that an explicit event bottleneck and no-event control objective produce a
+more temporally disciplined event-residual representation.
 \end{abstract}
 
 \section{Introduction}
@@ -74,8 +76,8 @@ Our contributions are:
     \item A stochastic event bottleneck trained with matched no-event controls.
     \item A leakage-safe public-data implementation using SEC accepted timestamps and public
     price histories.
-    \item A real-data study showing that residual control changes model behavior, improves
-    paired CEBT-vs-ablation MSE, and produces the strongest abnormal-return rank ordering.
+    \item A real-data study showing that residual control changes model behavior and that CEBT
+    produces the strongest abnormal-return rank ordering under clustered uncertainty checks.
 \end{enumerate}
 
 \section{Related Work}
@@ -130,7 +132,7 @@ latent sparsity, and a small residual-variance consistency penalty:
 \section{Data and Leakage Controls}
 
 We build a public-data experiment from SEC EDGAR APIs \citep{secapi}. The paper-scale run covers
-50 large U.S. firms, SEC 8-K filings from 2021--2025, and daily public prices. Each event row stores
+98 usable large U.S. firms, SEC 8-K filings from 2020--2025, and daily public prices. Each event row stores
 CIK, ticker, accession number, form type, filing date, accepted timestamp, available timestamp,
 source URL, text hash, and local provenance. Event label windows start from the first tradable
 session after public availability. If a filing is accepted after 16:00 ET, the label starts on the
@@ -147,12 +149,12 @@ within a 10-calendar-day blackout window around known events.
 \toprule
 Artifact & Count \\
 \midrule
-Companies & 50 \\
-SEC 8-K events & 2,971 \\
-Matched no-event controls & 2,971 \\
-Feature rows & 5,942 \\
-Public price rows & 69,003 \\
-Held-out test rows & 1,220 \\
+Usable companies & 98 \\
+SEC 8-K events & 7,236 \\
+Matched no-event controls & 7,236 \\
+Feature rows & 14,472 \\
+Public price rows & 159,093 \\
+Held-out test rows & 2,463 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -161,22 +163,23 @@ Held-out test rows & 1,220 \\
 
 We compare five models: no-event dynamics only, text-only MLP, concat-fusion, CEBT without
 control losses, and full CEBT. The target vector contains five-trading-day abnormal return,
-volatility jump, and volume jump. Confidence intervals are nonparametric bootstrap intervals
-over held-out rows.
+volatility jump, and volume jump. We report iid row bootstrap intervals and clustered
+bootstrap sensitivity intervals by ticker and by label-start month.
 
 \begin{table}[H]
 \centering
-\caption{Held-out paper-scale results. MSE is over the three target dimensions. Bootstrap intervals
-are over held-out rows.}
+\caption{Held-out paper-scale results. MSE is over the three target dimensions. Rank-IC intervals
+shown here are ticker-clustered; month-clustered intervals are discussed in the text.}
+\small
 \begin{tabular}{lrrrr}
 \toprule
-Model & MSE & 95\% CI & Rank IC & 95\% CI \\
+Model & MSE & 95\% CI & Rank IC & Ticker-cluster 95\% CI \\
 \midrule
-No-event & 0.0604 & [0.0460, 0.0772] & -0.0817 & [-0.1390, -0.0262] \\
-Text-only & 0.0550 & [0.0427, 0.0706] & -0.0230 & [-0.0777, 0.0310] \\
-Concat fusion & \textbf{0.0533} & [0.0411, 0.0689] & -0.0155 & [-0.0709, 0.0425] \\
-CEBT, no controls & 0.0546 & [0.0433, 0.0694] & 0.0239 & [-0.0299, 0.0830] \\
-CEBT & 0.0537 & [0.0424, 0.0686] & \textbf{0.0623} & [0.0042, 0.1222] \\
+No-event & 0.0696 & [0.0535, 0.0907] & -0.0411 & [-0.0840, 0.0016] \\
+Text-only & 0.0643 & [0.0512, 0.0820] & -0.0009 & [-0.0456, 0.0434] \\
+Concat fusion & \textbf{0.0597} & [0.0456, 0.0784] & -0.0182 & [-0.0597, 0.0267] \\
+CEBT, no controls & 0.0666 & [0.0507, 0.0874] & 0.0279 & [-0.0139, 0.0716] \\
+CEBT & 0.0660 & [0.0504, 0.0867] & \textbf{0.0463} & [0.0052, 0.0893] \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -189,10 +192,27 @@ than the baseline.}
 \toprule
 Baseline & Baseline--CEBT MSE & 95\% CI & CEBT better? \\
 \midrule
-CEBT, no controls & 0.00091 & [0.00023, 0.00168] & Yes \\
-Concat fusion & -0.00037 & [-0.00555, 0.00578] & No \\
-No-event & 0.00672 & [-0.00076, 0.01622] & No \\
-Text-only & 0.00133 & [-0.00367, 0.00735] & No \\
+CEBT, no controls & 0.00056 & [0.00019, 0.00097] & Yes \\
+Concat fusion & -0.00630 & [-0.00863, -0.00416] & No \\
+No-event & 0.00359 & [0.00184, 0.00549] & Yes \\
+Text-only & -0.00171 & [-0.00524, 0.00143] & No \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Paired abnormal-return rank-IC comparisons against full CEBT. Positive values mean CEBT
+has higher rank IC than the baseline.}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Baseline & CEBT--baseline rank IC & 95\% CI & CEBT better? \\
+\midrule
+CEBT, no controls & 0.0184 & [-0.0202, 0.0595] & No \\
+Concat fusion & 0.0645 & [0.0058, 0.1215] & Yes \\
+No-event & 0.0874 & [0.0251, 0.1534] & Yes \\
+Text-only & 0.0472 & [-0.0097, 0.1028] & No \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -200,8 +220,9 @@ Text-only & 0.00133 & [-0.00367, 0.00735] & No \\
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/metric_comparison.png}
-\caption{Forecast error with bootstrap confidence intervals. Concat fusion and CEBT have similar
-MSE; paired intervals do not show a significant difference between them.}
+\caption{Forecast error with bootstrap confidence intervals. Concat fusion has the strongest
+point-estimate MSE; CEBT's advantage appears in rank ordering and residual discipline rather than
+raw multi-target regression error.}
 \end{figure}
 
 \begin{figure}[H]
@@ -213,53 +234,76 @@ model whose interval is entirely above zero.}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/event_delta_controls.png}
-\caption{Mean absolute event residual on true events and matched controls. The full CEBT control
-loss strongly suppresses residuals on controls relative to CEBT without controls.}
+\includegraphics[width=0.92\linewidth]{figures/temporal_rank_ic_heatmap.png}
+\caption{Monthly event-ranking signal by model. The heatmap shows where rank signal appears and
+whether it is temporally concentrated or persistent across the held-out period.}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.70\linewidth]{figures/prediction_scatter.png}
-\caption{CEBT predicted versus realized abnormal returns on the held-out split. The scatter remains
-noisy, but CEBT is the only tested model with positive rank IC whose bootstrap interval excludes
-zero.}
+\includegraphics[width=0.92\linewidth]{figures/event_residual_mosaic.png}
+\caption{CEBT event-residual mosaic by company and month. Darker cells indicate months where the
+model routes more mass through the event residual rather than the no-event baseline; white cells
+indicate no held-out real 8-K events for that company-month.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\linewidth]{figures/residual_distribution.png}
+\caption{Residual distribution for true 8-K events and matched no-event controls. The distributional
+view is more informative than a mean-only bar chart: controls concentrate near zero, while true
+events have a heavier residual tail.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.68\linewidth]{figures/prediction_phase_portrait.png}
+\caption{CEBT event-return phase portrait on held-out real disclosures. The density plot shows
+where predictions and realized abnormal returns concentrate, making the narrow prediction band and
+wide realized-return dispersion visible without plotting thousands of overlapping points.}
 \end{figure}
 
 \section{Findings}
 
-\paragraph{Bottleneck controls improve the CEBT architecture.}
-Full CEBT improves paired MSE over CEBT without controls by 0.00091 with a 95\% paired bootstrap
-interval of [0.00023, 0.00168]. This supports the control objective as a useful architectural
-constraint rather than an ornamental regularizer.
+\paragraph{CEBT is an event-ranking model, not the best raw regressor.}
+Concat fusion has the best point-estimate MSE, 0.0597, while full CEBT has MSE 0.0660. This
+matters: the architectural decomposition does not automatically minimize multi-target regression
+error. The evidence for CEBT is instead concentrated in rank ordering of event outcomes.
+
+\paragraph{The event-ranking signal survives clustered uncertainty checks.}
+Full CEBT has abnormal-return rank IC 0.0463. Its iid bootstrap interval is [0.0074, 0.0836],
+the ticker-clustered interval is [0.0052, 0.0893], and the month-clustered interval is
+[0.0112, 0.0768]. No other tested model has a positive clustered interval excluding zero.
+
+\paragraph{Paired rank comparisons separate CEBT from stronger baselines.}
+CEBT improves paired rank IC over concat fusion by 0.0645 with a 95\% paired interval
+[0.0058, 0.1215], and over no-event dynamics by 0.0874 with interval [0.0251, 0.1534]. The
+improvement over CEBT without controls is positive, 0.0184, but not resolved by the paired
+interval [-0.0202, 0.0595].
 
 \paragraph{Control losses alter the residual semantics.}
-The full CEBT model assigns mean absolute event residual 0.0861 to true events and 0.0199 to
-controls. The no-control variant assigns 0.1443 to true events and 0.1095 to controls. Thus, the
-control objective reduces spurious residual assignment to no-event dates by roughly 82\%.
-
-\paragraph{Return ranking becomes positive only for full CEBT.}
-Full CEBT has abnormal-return rank IC 0.0623 with a bootstrap interval [0.0042, 0.1222]. All
-baselines have intervals that include zero or are negative. The effect is modest, but it is the
-strongest evidence that the bottleneck-and-control design changes event ordering rather than only
-multi-target regression error.
+The full CEBT model assigns mean absolute event residual 0.0313 to true events and 0.0103 to
+controls. The no-control variant assigns 0.0396 to true events and 0.0298 to controls. Thus, the
+control objective reduces spurious residual assignment to no-event dates by about 66\%, while
+preserving a roughly 3.0x event-to-control residual ratio.
 
 \section{Limitations}
 
 This is a first paper-scale run, not a final investment model. The text encoder is a deterministic
 open hashing baseline rather than a large pretrained financial encoder. The public price source is
 not CRSP, and labels use daily closes rather than intraday event windows. The universe is restricted
-to 50 large firms and 8-K filings. The next version should test pretrained open embeddings,
-larger universes, sector controls, and stronger counterfactual matching.
+to 8-K filings, and two configured tickers did not yield final usable event rows because of SEC
+retrieval failures during the build. The next version should test pretrained open embeddings,
+10-Q/10-K extensions, sector controls, and harder placebo controls where no-event dates receive
+unrelated historical disclosure text instead of a zero event embedding.
 
 \section{Conclusion}
 
 CEBT reframes event-driven financial modeling as a decomposition problem: ordinary market dynamics
-plus a disclosure-induced residual. In a real public-data experiment, the full model improves over
-its no-control ablation, assigns much smaller residuals to matched controls, and is the only tested
-model with positive abnormal-return rank IC whose confidence interval excludes zero. The result
-supports CEBT as a promising architecture for studying event-specific effects under strict temporal
-information boundaries.
+plus a disclosure-induced residual. In a real public-data experiment, CEBT does not beat concat
+fusion on raw MSE, but it produces the strongest abnormal-return rank ordering and remains positive
+under ticker- and month-clustered uncertainty checks. The result supports CEBT as a promising
+architecture for studying event-specific effects under strict temporal information boundaries.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

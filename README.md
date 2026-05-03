@@ -75,6 +75,9 @@ uv run python scripts/60_ablate.py --config configs/paper_v2.yaml --output-dir d
 uv run python scripts/70_make_tables.py --config configs/paper_v2.yaml --output-dir data/runs/paper_v2
 ```
 
+The larger current-paper run uses `configs/paper_v3.yaml` and follows the same script order with
+`data/processed/paper_v3` and `data/runs/paper_v3`.
+
 The current draft lives at `paper/main.tex`, with figures in `paper/figures/` and table exports in `paper/tables/`.
 
 ## Data Policy
