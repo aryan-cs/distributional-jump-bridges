@@ -1,0 +1,17 @@
+project:
+  name: cebt
+  run_name: paper_v3
+seed: 29
+
+model:
+  config_path: "configs/model/dot_small.yaml"
+
+training:
+  epochs: 15
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  amp: true
+  split:
+    train_until: "2023-12-31"
+    val_until: "2024-12-31"

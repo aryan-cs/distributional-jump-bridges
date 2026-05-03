@@ -15,6 +15,8 @@ class CEBTConfig:
     event_embedding_dim: int = 256
     hidden_dim: int = 96
     latent_dim: int = 8
+    operator_rank: int = 4
+    operator_scale: float = 0.10
     output_dim: int = 3
     dropout: float = 0.1
 
@@ -223,6 +225,76 @@ class ConcatFusionModel(nn.Module):
         }
 
 
+class DisclosureOperatorTransformer(nn.Module):
+    """Map disclosures to low-rank latent state transition operators.
+
+    The event text does not enter the prediction head directly. Instead, it generates a
+    sample-specific low-rank operator that perturbs the no-event latent state. This makes
+    event influence observable as a state intervention.
+    """
+
+    def __init__(self, config: CEBTConfig) -> None:
+        super().__init__()
+        self.config = config
+        self.no_event = NoEventDynamics(config)
+        self.base_transition = nn.Linear(config.hidden_dim, config.hidden_dim, bias=False)
+        self.operator_rank = config.operator_rank
+        self.operator_scale = config.operator_scale
+        self.operator_generator = nn.Sequential(
+            nn.Linear(config.event_embedding_dim + config.metadata_features, config.hidden_dim),
+            nn.LayerNorm(config.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(
+                config.hidden_dim,
+                (2 * config.hidden_dim * config.operator_rank) + config.operator_rank,
+            ),
+        )
+        self.operator_norm = nn.LayerNorm(config.hidden_dim)
+        self.head = nn.Sequential(
+            nn.LayerNorm(config.hidden_dim + config.metadata_features),
+            nn.Linear(config.hidden_dim + config.metadata_features, config.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.hidden_dim, config.output_dim),
+        )
+        nn.init.eye_(self.base_transition.weight)
+
+    def forward(
+        self,
+        x_pre: torch.Tensor,
+        event_embedding: torch.Tensor,
+        metadata: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
+        base_prediction, state = self.no_event(x_pre, metadata)
+        generated = self.operator_generator(torch.cat([event_embedding, metadata], dim=-1))
+        batch = generated.shape[0]
+        rank = self.operator_rank
+        hidden = self.config.hidden_dim
+        left_end = hidden * rank
+        right_end = left_end + hidden * rank
+        left = generated[:, :left_end].reshape(batch, hidden, rank)
+        right = generated[:, left_end:right_end].reshape(batch, hidden, rank)
+        gate = torch.tanh(generated[:, right_end:])
+        left = torch.tanh(left)
+        right = torch.tanh(right)
+        projected = torch.bmm(state.unsqueeze(1), right).squeeze(1)
+        low_rank_update = torch.bmm(left, (projected * gate).unsqueeze(-1)).squeeze(-1)
+        low_rank_update = low_rank_update * (self.operator_scale / max(rank, 1) ** 0.5)
+        base_state = self.base_transition(state)
+        event_state = self.operator_norm(base_state + low_rank_update)
+        prediction = self.head(torch.cat([event_state, metadata], dim=-1))
+        return {
+            "prediction": prediction,
+            "base_prediction": base_prediction,
+            "event_delta": prediction - base_prediction,
+            "z_event": low_rank_update,
+            "mu": state.new_zeros((state.shape[0], 1)),
+            "logvar": state.new_zeros((state.shape[0], 1)),
+            "operator_norm": torch.linalg.vector_norm(low_rank_update, dim=-1),
+        }
+
+
 def build_model(model_name: str, config: CEBTConfig) -> nn.Module:
     if model_name in {"cebt", "cebt_no_controls"}:
         return CounterfactualEventBottleneckTransformer(config)
@@ -232,4 +304,6 @@ def build_model(model_name: str, config: CEBTConfig) -> nn.Module:
         return TextOnlyMLP(config)
     if model_name == "concat":
         return ConcatFusionModel(config)
+    if model_name in {"dot", "disclosure_operator"}:
+        return DisclosureOperatorTransformer(config)
     raise ValueError(f"Unknown model_name: {model_name}")

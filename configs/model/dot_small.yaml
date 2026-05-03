@@ -5,12 +5,14 @@ model:
   hidden_dim: 96
   latent_dim: 8
   operator_rank: 4
-  operator_scale: 0.10
+  operator_scale: 0.15
   output_dim: 3
   dropout: 0.10
 loss:
   supervised_weight: 1.0
   control_delta_weight: 0.25
-  kl_weight: 0.01
-  sparsity_weight: 0.001
+  kl_weight: 0.0
+  sparsity_weight: 0.0
   consistency_weight: 0.05
+  rank_weight: 0.10
+  rank_temperature: 0.02

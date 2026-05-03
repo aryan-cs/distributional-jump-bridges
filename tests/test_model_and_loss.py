@@ -37,6 +37,28 @@ def test_bottleneck_dimension_changes_latent_shape() -> None:
     assert large(x, e, m)["mu"].shape[-1] == 8
 
 
+def test_disclosure_operator_forward_shapes() -> None:
+    config = CEBTConfig(
+        price_features=8,
+        metadata_features=6,
+        event_embedding_dim=16,
+        hidden_dim=32,
+        latent_dim=4,
+        operator_rank=3,
+    )
+    model = build_model("dot", config)
+    outputs = model(
+        torch.randn(4, 5, 8),
+        torch.randn(4, 16),
+        torch.randn(4, 6),
+    )
+    assert outputs["prediction"].shape == (4, 3)
+    assert outputs["event_delta"].shape == (4, 3)
+    assert outputs["z_event"].shape == (4, 32)
+    assert outputs["operator_norm"].shape == (4,)
+    assert torch.all(torch.isfinite(outputs["operator_norm"]))
+
+
 def test_pairwise_rank_loss_rewards_correct_ordering_on_events() -> None:
     targets = torch.tensor([0.20, -0.10, 0.05, 0.50])
     is_event = torch.tensor([1.0, 1.0, 1.0, 0.0])
