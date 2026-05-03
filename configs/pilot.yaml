@@ -1,0 +1,46 @@
+project:
+  name: cebt
+  run_name: pilot
+seed: 7
+
+data:
+  tickers: ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL"]
+  start_date: "2022-01-01"
+  end_date: "2025-12-31"
+  forms: ["8-K"]
+  max_events_per_company: 80
+  pre_window: 40
+  horizon: 5
+  control_blackout_days: 10
+  controls_per_event: 1
+
+sec:
+  base_url: "https://data.sec.gov"
+  archives_url: "https://www.sec.gov/Archives/edgar/data"
+  ticker_url: "https://www.sec.gov/files/company_tickers_exchange.json"
+  max_requests_per_second: 8
+  user_agent_env: "SEC_USER_AGENT"
+
+prices:
+  provider: "stooq"
+  market_ticker: "SPY"
+
+features:
+  embedding:
+    provider: "hashing"
+    model_id: "cebt.hashing-v1"
+    dim: 256
+  metadata_dim: 6
+
+model:
+  config_path: "configs/model/cebt_small.yaml"
+
+training:
+  epochs: 3
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  amp: true
+  split:
+    train_until: "2024-06-30"
+    val_until: "2025-03-31"

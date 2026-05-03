@@ -1,0 +1,14 @@
+model:
+  price_features: 8
+  metadata_features: 6
+  event_embedding_dim: 256
+  hidden_dim: 96
+  latent_dim: 8
+  output_dim: 3
+  dropout: 0.10
+loss:
+  supervised_weight: 1.0
+  control_delta_weight: 0.25
+  kl_weight: 0.01
+  sparsity_weight: 0.001
+  consistency_weight: 0.05
