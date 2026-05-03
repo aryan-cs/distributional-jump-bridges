@@ -2,7 +2,7 @@
 
 CEBT is a research codebase for a new architecture for event-driven financial modeling. The central claim is not that another SEC benchmark is needed. The claim is architectural:
 
-> Financial event models should separate ordinary market dynamics from event-induced causal residuals. CEBT learns a compact stochastic bottleneck for the incremental effect of a disclosure event, trained with matched no-event controls, counterfactual consistency losses, and leakage-safe market outcomes.
+> Financial event models should separate ordinary market dynamics from event-induced causal residuals. CEBT learns a compact stochastic bottleneck for the incremental effect of a disclosure event, trained with matched no-event residual suppression, bottleneck regularization, and leakage-safe market outcomes.
 
 The first experimental target is SEC disclosure events, especially 8-K filings, because they have sharp public timestamps and observable post-event market reactions.
 
@@ -65,14 +65,14 @@ uv run python scripts/60_ablate.py --config configs/pilot.yaml --output-dir data
 uv run python scripts/70_make_tables.py --config configs/pilot.yaml --output-dir data/runs/pilot
 ```
 
-For the paper-scale v1 run used by the current draft:
+For the paper-scale run used by the current draft:
 
 ```bash
-SEC_USER_AGENT="CEBT academic research <name> <email>" uv run python scripts/10_build_events.py --config configs/paper.yaml --output-dir data/processed/paper_v1
-uv run python scripts/20_download_prices.py --config configs/paper.yaml --output-dir data/processed/paper_v1
-uv run python scripts/30_build_features.py --config configs/paper.yaml --output-dir data/processed/paper_v1
-uv run python scripts/60_ablate.py --config configs/paper.yaml --output-dir data/runs/paper_v1
-uv run python scripts/70_make_tables.py --config configs/paper.yaml --output-dir data/runs/paper_v1
+SEC_USER_AGENT="CEBT academic research <name> <email>" uv run python scripts/10_build_events.py --config configs/paper_v2.yaml --output-dir data/processed/paper_v2
+uv run python scripts/20_download_prices.py --config configs/paper_v2.yaml --output-dir data/processed/paper_v2
+uv run python scripts/30_build_features.py --config configs/paper_v2.yaml --output-dir data/processed/paper_v2
+uv run python scripts/60_ablate.py --config configs/paper_v2.yaml --output-dir data/runs/paper_v2
+uv run python scripts/70_make_tables.py --config configs/paper_v2.yaml --output-dir data/runs/paper_v2
 ```
 
 The current draft lives at `paper/main.tex`, with figures in `paper/figures/` and table exports in `paper/tables/`.

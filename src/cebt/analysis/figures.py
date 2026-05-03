@@ -19,6 +19,7 @@ def make_figures(run_dir: str | Path) -> dict:
     outputs["architecture"] = str(_plot_architecture(figure_dir))
     if metrics:
         outputs["metric_comparison"] = str(_plot_metric_comparison(metrics, figure_dir))
+        outputs["rank_ic_comparison"] = str(_plot_rank_ic(metrics, figure_dir))
         outputs["event_delta_controls"] = str(_plot_event_delta(metrics, figure_dir))
     if predictions:
         outputs["prediction_scatter"] = str(_plot_prediction_scatter(predictions, figure_dir))
@@ -38,6 +39,16 @@ def _model_order(metrics: dict[str, dict]) -> list[str]:
     ordered = [name for name in preferred if name in metrics]
     ordered.extend(name for name in sorted(metrics) if name not in ordered)
     return ordered
+
+
+def _display_name(model: str) -> str:
+    return {
+        "no_event": "No-event",
+        "text_only": "Text-only",
+        "concat": "Concat fusion",
+        "cebt_no_controls": "CEBT\n(no controls)",
+        "cebt": "CEBT",
+    }.get(model, model)
 
 
 def _load_predictions(root: Path) -> list[dict]:
@@ -67,7 +78,36 @@ def _plot_metric_comparison(metrics: dict[str, dict], figure_dir: Path) -> Path:
     plt.bar(names, values, yerr=yerr, capsize=4, color="#4c78a8")
     plt.ylabel("MSE, lower is better")
     plt.title("Forecast Error With Bootstrap 95% CI")
-    plt.xticks(rotation=25, ha="right")
+    plt.xticks(range(len(names)), [_display_name(name) for name in names], rotation=15, ha="right")
+    plt.tight_layout()
+    plt.savefig(path, dpi=200)
+    plt.close()
+    return path
+
+
+def _plot_rank_ic(metrics: dict[str, dict], figure_dir: Path) -> Path:
+    names = _model_order(metrics)
+    values = [metrics[name]["abnormal_return_rank_ic"] for name in names]
+    lows = [
+        metrics[name].get("rank_ic_ci", {}).get("lo", values[idx])
+        for idx, name in enumerate(names)
+    ]
+    highs = [
+        metrics[name].get("rank_ic_ci", {}).get("hi", values[idx])
+        for idx, name in enumerate(names)
+    ]
+    yerr = [
+        [max(value - lo, 0.0) for value, lo in zip(values, lows, strict=False)],
+        [max(hi - value, 0.0) for value, hi in zip(values, highs, strict=False)],
+    ]
+    colors = ["#9ca3af" if name != "cebt" else "#2a9d8f" for name in names]
+    path = figure_dir / "rank_ic_comparison.png"
+    plt.figure(figsize=(8, 4.5))
+    plt.bar(names, values, yerr=yerr, capsize=4, color=colors)
+    plt.axhline(0.0, color="black", linewidth=0.9)
+    plt.ylabel("Abnormal-return rank IC")
+    plt.title("Event Ranking Signal With Bootstrap 95% CI")
+    plt.xticks(range(len(names)), [_display_name(name) for name in names], rotation=15, ha="right")
     plt.tight_layout()
     plt.savefig(path, dpi=200)
     plt.close()
@@ -89,7 +129,7 @@ def _plot_event_delta(metrics: dict[str, dict], figure_dir: Path) -> Path:
     plt.bar([value + 0.18 for value in x], control_values, width=0.36, label="Controls")
     plt.ylabel("Mean absolute event delta")
     plt.title("Event Residual Magnitude Separates Events From Controls")
-    plt.xticks(list(x), names, rotation=25, ha="right")
+    plt.xticks(list(x), [_display_name(name) for name in names], rotation=15, ha="right")
     plt.legend()
     plt.tight_layout()
     plt.savefig(path, dpi=200)
