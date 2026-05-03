@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import os
 import time
+import warnings
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
 from cebt.utils.hashing import sha256_text, stable_id
 from cebt.utils.io import write_json
@@ -251,7 +252,9 @@ def select_companies(
 
 
 def html_to_text(html: str) -> str:
-    soup = BeautifulSoup(html, "lxml")
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+        soup = BeautifulSoup(html, "lxml")
     for element in soup(["script", "style", "noscript"]):
         element.decompose()
     return "\n".join(line.strip() for line in soup.get_text("\n").splitlines() if line.strip())
