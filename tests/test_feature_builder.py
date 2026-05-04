@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import numpy as np
 import pytest
 
+from cebt.data.factors import FactorRow
 from cebt.data.prices import PriceBar
 from cebt.features.build import _compound_market_return, build_feature_bundle, validate_feature_rows
 from cebt.utils.time import TradingCalendar
@@ -45,7 +46,7 @@ def test_feature_bundle_builds_real_events_and_controls(tmp_path) -> None:
             "pre_window": 5,
             "horizon": 3,
             "control_blackout_days": 5,
-            "controls_per_event": 1,
+            "controls_per_event": 3,
         },
         "features": {"embedding": {"dim": 16, "model_id": "test-hash"}},
         "training": {"split": {"train_until": "2024-12-31", "val_until": "2025-12-31"}},
@@ -56,8 +57,71 @@ def test_feature_bundle_builds_real_events_and_controls(tmp_path) -> None:
     assert bundle.metadata.shape[1] == 6
     assert bundle.y.shape[1] == 3
     assert {row["control_type"] for row in bundle.rows} == {"real_event", "same_ticker_no_event"}
+    assert len([row for row in bundle.rows if row["control_type"] == "same_ticker_no_event"]) == 3
+    assert _control_windows_do_not_overlap(bundle.rows)
     assert all(row["feature_max_date"] < row["label_start_date"] for row in bundle.rows)
     assert np.all(np.isfinite(bundle.y))
+
+
+def test_feature_bundle_builds_ff4_factor_residual_labels(tmp_path) -> None:
+    bars = _bars("MSFT", date(2023, 1, 3), 130)
+    market = _bars("SPY", date(2023, 1, 3), 130)
+    factors = [
+        FactorRow(
+            date=bar.date,
+            mkt_rf=0.001,
+            smb=0.0002,
+            hml=-0.0001,
+            rf=0.00005,
+            mom=0.0003,
+            source_url="unit-test",
+        )
+        for bar in bars
+    ]
+    event = {
+        "event_id": "event:ff4",
+        "ticker": "MSFT",
+        "cik": "0000789019",
+        "company_name": "Microsoft Corp.",
+        "accession_number": "0000789019-23-000001",
+        "form_type": "8-K",
+        "filing_date": "2023-03-28",
+        "accepted_at": "2023-03-28T18:00:00+00:00",
+        "available_at": "2023-03-28T18:00:00+00:00",
+        "source_url": "https://www.sec.gov/",
+    }
+    config = {
+        "seed": 11,
+        "data": {
+            "pre_window": 10,
+            "horizon": 3,
+            "control_blackout_days": 5,
+            "controls_per_event": 1,
+        },
+        "labels": {
+            "mode": "ff4",
+            "factor_estimation_window": 20,
+            "min_factor_observations": 8,
+        },
+        "features": {"embedding": {"dim": 8, "model_id": "test-hash"}},
+        "training": {"split": {"train_until": "2023-12-31", "val_until": "2024-12-31"}},
+    }
+
+    bundle = build_feature_bundle(
+        [event],
+        {"MSFT": bars, "SPY": market},
+        market,
+        config,
+        tmp_path,
+        factor_rows=factors,
+    )
+
+    real_rows = [row for row in bundle.rows if row["control_type"] == "real_event"]
+    assert real_rows
+    assert real_rows[0]["label_mode"] == "ff4"
+    assert real_rows[0]["label_source"] == "future_returns_and_factors_only"
+    assert real_rows[0]["label_factor_model"] == "FF4"
+    assert real_rows[0]["label_factor_observations"] >= 8
 
 
 def test_market_forward_return_excludes_label_start_close_return() -> None:
@@ -74,6 +138,22 @@ def test_market_forward_return_excludes_label_start_close_return() -> None:
     expected = (1.10 * 0.95 * 1.02) - 1.0
 
     assert observed == pytest.approx(expected)
+
+
+def _control_windows_do_not_overlap(rows: list[dict]) -> bool:
+    windows = [
+        (
+            date.fromisoformat(row["label_start_date"]),
+            date.fromisoformat(row["label_end_date"]),
+        )
+        for row in rows
+        if row["control_type"] == "same_ticker_no_event"
+    ]
+    for left_idx, (left_start, left_end) in enumerate(windows):
+        for right_start, right_end in windows[left_idx + 1 :]:
+            if left_start <= right_end and right_start <= left_end:
+                return False
+    return True
 
 
 def _bars(ticker: str, start: date, count: int) -> list[PriceBar]:

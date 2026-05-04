@@ -1,0 +1,27 @@
+extends: configs/paper_v3_bge.yaml
+
+project:
+  name: cebt
+  run_name: paper_v3_bge_ff4
+seed: 29
+
+labels:
+  mode: "ff4"
+  factor_path: "data/processed/paper_v3_bge_ff4/fama_french_daily.jsonl"
+  download_factors: true
+  factor_estimation_window: 80
+  min_factor_observations: 40
+
+model:
+  config_path: "configs/model/djb_bge_small.yaml"
+
+training:
+  epochs: 18
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  amp: true
+  save_best: true
+  split:
+    train_until: "2023-12-31"
+    val_until: "2024-12-31"

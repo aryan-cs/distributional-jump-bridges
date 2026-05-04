@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from cebt.cli import load_run_config, output_dir, parse_args
+from pathlib import Path
+from typing import Any
+
+from cebt.cli import load_run_config, output_dir, parse_args, resolve_path
+from cebt.data.factors import fetch_french_daily_factors, load_factor_rows
 from cebt.data.prices import PriceBar
 from cebt.features.build import build_feature_bundle
 from cebt.utils.io import read_jsonl
@@ -24,8 +28,27 @@ def main() -> None:
     market_bars = prices_by_ticker.get(market_ticker, [])
     if not market_bars:
         raise SystemExit(f"Missing market proxy price rows for {market_ticker}")
-    bundle = build_feature_bundle(events, prices_by_ticker, market_bars, config, out)
+    factor_rows = _load_or_fetch_factors(config, out)
+    bundle = build_feature_bundle(events, prices_by_ticker, market_bars, config, out, factor_rows)
     print(f"Wrote feature bundle with {bundle.x_pre.shape[0]} rows to {out / 'features.npz'}")
+
+
+def _load_or_fetch_factors(config: dict[str, Any], out: Path) -> list:
+    labels = config.get("labels", {})
+    mode = str(labels.get("mode", "spy")).lower()
+    if mode not in {"ff3", "ff4"}:
+        return []
+    factor_path = labels.get("factor_path")
+    factor_path = resolve_path(factor_path) if factor_path else out / "fama_french_daily.jsonl"
+    rows = load_factor_rows(factor_path)
+    if rows:
+        return rows
+    if not bool(labels.get("download_factors", True)):
+        raise SystemExit(f"Missing Fama-French factor rows: {factor_path}")
+    return fetch_french_daily_factors(
+        factor_path,
+        include_momentum=mode == "ff4",
+    )
 
 
 if __name__ == "__main__":

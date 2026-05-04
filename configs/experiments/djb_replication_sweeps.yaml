@@ -1,0 +1,54 @@
+base_config: configs/paper_v3_bge_rc_djb.yaml
+feature_dir: data/processed/paper_v3_bge
+output_root: data/runs/djb_replication_sweeps
+models: ["djb", "rc_djb"]
+seeds: [29, 42, 7, 88, 13]
+interventions: ["full"]
+
+sweeps:
+  - id: baseline
+    overrides: {}
+  - id: rank_temperature_010
+    overrides:
+      loss:
+        rank_temperature: 0.10
+  - id: rank_weight_half
+    overrides:
+      loss:
+        rank_weight: 0.075
+  - id: rank_weight_double
+    overrides:
+      loss:
+        rank_weight: 0.30
+  - id: nll_weight_half
+    overrides:
+      loss:
+        nll_weight: 0.05
+  - id: nll_weight_double
+    overrides:
+      loss:
+        nll_weight: 0.20
+  - id: control_delta_half
+    overrides:
+      loss:
+        control_delta_weight: 0.175
+  - id: control_delta_double
+    overrides:
+      loss:
+        control_delta_weight: 0.70
+  - id: sparsity_half
+    overrides:
+      loss:
+        sparsity_weight: 0.0005
+  - id: sparsity_double
+    overrides:
+      loss:
+        sparsity_weight: 0.002
+  - id: consistency_half
+    overrides:
+      loss:
+        consistency_weight: 0.025
+  - id: consistency_double
+    overrides:
+      loss:
+        consistency_weight: 0.10

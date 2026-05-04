@@ -46,6 +46,9 @@ prices:
   provider: "auto"
   market_ticker: "SPY"
 
+labels:
+  mode: "spy"
+
 features:
   embedding:
     provider: "sentence_transformers"

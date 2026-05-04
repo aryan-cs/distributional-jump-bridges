@@ -6,6 +6,7 @@ import numpy as np
 
 from cebt.analysis.tables import make_tables
 from cebt.evaluation.bootstrap import clustered_bootstrap_ci, leave_one_group_out
+from cebt.evaluation.evaluate import _rank_ic_by_group, _transport_auc
 from cebt.utils.io import write_json, write_jsonl
 
 
@@ -37,6 +38,51 @@ def test_leave_one_group_out_reports_extreme_groups() -> None:
     assert result["min_group"] == "c"
     assert result["max_group"] == "a"
     assert result["min"] < result["full"] < result["max"]
+
+
+def test_rank_ic_by_group_reports_month_intervals() -> None:
+    rank_values = np.asarray(
+        [
+            [0.1, 0.1],
+            [0.2, 0.2],
+            [0.3, 0.3],
+            [0.4, 0.4],
+            [0.5, 0.5],
+            [0.6, 0.6],
+            [0.7, 0.7],
+            [0.8, 0.8],
+            [0.1, 0.8],
+            [0.2, 0.7],
+            [0.3, 0.6],
+            [0.4, 0.5],
+            [0.5, 0.4],
+            [0.6, 0.3],
+            [0.7, 0.2],
+            [0.8, 0.1],
+        ]
+    )
+    groups = np.asarray(["2025-01"] * 8 + ["2025-02"] * 8, dtype=object)
+
+    rows = _rank_ic_by_group(rank_values, groups, seed=5, min_rows=8)
+
+    assert [row["group"] for row in rows] == ["2025-01", "2025-02"]
+    assert rows[0]["rank_ic"] > 0
+    assert rows[1]["rank_ic"] < 0
+    assert "rank_ic_ci" in rows[0]
+
+
+def test_response_transport_auc_uses_non_return_channels() -> None:
+    deltas = np.asarray(
+        [
+            [10.0, 0.4, 0.5],
+            [8.0, 0.3, 0.4],
+            [1.0, 0.1, 0.1],
+            [1.0, 0.0, 0.1],
+        ]
+    )
+    labels = np.asarray([1.0, 1.0, 0.0, 0.0])
+
+    assert _transport_auc(deltas, labels) == 1.0
 
 
 def test_make_tables_writes_paired_rank_ic_table(tmp_path) -> None:

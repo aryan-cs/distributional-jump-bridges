@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 
+from cebt.data.factors import FactorRow, factor_rows_by_date
 from cebt.data.prices import PriceBar, close_returns
 from cebt.features.embeddings import build_embedder, embed_texts_with_cache, zero_embedding
 from cebt.utils.hashing import stable_id
@@ -42,6 +43,15 @@ class PriceContext:
     ordered_dates: list[date]
     date_index: dict[date, int]
     market_returns: dict[date, float]
+    factor_returns: dict[date, FactorRow]
+
+
+@dataclass(frozen=True)
+class LabelVector:
+    values: np.ndarray
+    source: str
+    mode: str
+    details: dict[str, Any]
 
 
 def build_feature_bundle(
@@ -50,9 +60,11 @@ def build_feature_bundle(
     market_bars: list[PriceBar],
     config: dict[str, Any],
     output_dir: str | Path,
+    factor_rows: list[FactorRow] | None = None,
 ) -> FeatureBundle:
     data_config = config.get("data", {})
     feature_config = config.get("features", {})
+    label_config = config.get("labels", {})
     embedding_config = feature_config.get("embedding", {})
     pre_window = int(data_config.get("pre_window", 40))
     horizon = int(data_config.get("horizon", 5))
@@ -78,8 +90,9 @@ def build_feature_bundle(
     is_event_rows: list[float] = []
     event_ids: list[str] = []
 
+    factors_by_date = factor_rows_by_date(factor_rows or [])
     contexts = {
-        ticker: _price_context(bars, market_returns)
+        ticker: _price_context(bars, market_returns, factors_by_date)
         for ticker, bars in prices_by_ticker.items()
         if bars
     }
@@ -119,6 +132,7 @@ def build_feature_bundle(
             pre_window=pre_window,
             horizon=horizon,
             forced_start=None,
+            label_config=label_config,
         )
         if sample:
             _append_sample(sample, rows, x_rows, e_rows, m_rows, y_rows, is_event_rows, event_ids)
@@ -126,6 +140,8 @@ def build_feature_bundle(
             event,
             control_candidates.get(ticker, []),
             controls_per_event,
+            horizon,
+            context.calendar,
         ):
             control_id = stable_id(event["event_id"], control_start.isoformat(), prefix="control")
             control_sample = _build_sample(
@@ -137,6 +153,7 @@ def build_feature_bundle(
                 pre_window=pre_window,
                 horizon=horizon,
                 forced_start=control_start,
+                label_config=label_config,
             )
             if control_sample:
                 _append_sample(
@@ -182,6 +199,7 @@ def build_feature_bundle(
             "embedding_provider": embedding_config.get("provider", "hashing"),
             "embedding_model_id": embedder.model_id,
             "embedding_dim": embedding_dim,
+            "label_mode": _label_mode(label_config),
         },
     )
     return bundle
@@ -208,6 +226,7 @@ def load_feature_bundle(feature_path: str | Path, metadata_path: str | Path) -> 
 
 
 def validate_feature_rows(rows: list[dict[str, Any]]) -> None:
+    allowed_label_sources = {"future_returns_only", "future_returns_and_factors_only"}
     for row in rows:
         feature_max = parse_date(row["feature_max_date"])
         label_start = parse_date(row["label_start_date"])
@@ -215,11 +234,15 @@ def validate_feature_rows(rows: list[dict[str, Any]]) -> None:
             raise ValueError(
                 f"Feature leakage for {row['sample_id']}: {feature_max} >= {label_start}"
             )
-        if row.get("label_source") != "future_returns_only":
+        if row.get("label_source") not in allowed_label_sources:
             raise ValueError(f"Invalid label source for {row['sample_id']}")
 
 
-def _price_context(bars: list[PriceBar], market_returns: dict[date, float]) -> PriceContext:
+def _price_context(
+    bars: list[PriceBar],
+    market_returns: dict[date, float],
+    factors_by_date: dict[date, FactorRow],
+) -> PriceContext:
     ordered_bars = sorted(bars, key=lambda row: row.date)
     ordered_dates = [bar.date for bar in ordered_bars]
     return PriceContext(
@@ -231,6 +254,7 @@ def _price_context(bars: list[PriceBar], market_returns: dict[date, float]) -> P
         ordered_dates=ordered_dates,
         date_index={day: idx for idx, day in enumerate(ordered_dates)},
         market_returns=market_returns,
+        factor_returns=factors_by_date,
     )
 
 
@@ -243,6 +267,7 @@ def _build_sample(
     pre_window: int,
     horizon: int,
     forced_start: date | None,
+    label_config: dict[str, Any],
 ) -> dict[str, Any] | None:
     start = forced_start or context.calendar.event_start_date(event["available_at"])
     end = context.calendar.event_end_date(start, horizon)
@@ -254,8 +279,8 @@ def _build_sample(
     x_pre = _price_window_features(pre_dates, context)
     if x_pre is None:
         return None
-    y = _label_vector(start, end, context)
-    if y is None:
+    label = _label_vector(start, end, context, label_config, pre_window)
+    if label is None:
         return None
     feature_max = pre_dates[-1]
     row = {
@@ -271,13 +296,15 @@ def _build_sample(
         "label_end_date": end.isoformat(),
         "feature_min_date": pre_dates[0].isoformat(),
         "feature_max_date": feature_max.isoformat(),
-        "label_source": "future_returns_only",
+        "label_source": label.source,
+        "label_mode": label.mode,
         "x_pre": x_pre,
         "event_embedding": event_embedding,
         "metadata": _metadata(event, control_type, start),
-        "y": y,
+        "y": label.values,
         "is_event": 1.0 if control_type == "real_event" else 0.0,
     }
+    row.update(label.details)
     return row
 
 
@@ -353,7 +380,9 @@ def _label_vector(
     start: date,
     end: date,
     context: PriceContext,
-) -> np.ndarray | None:
+    label_config: dict[str, Any],
+    pre_window: int,
+) -> LabelVector | None:
     if (
         start not in context.bars_by_date
         or end not in context.bars_by_date
@@ -361,13 +390,33 @@ def _label_vector(
     ):
         return None
     forward_return = context.bars_by_date[end].close / context.bars_by_date[start].close - 1.0
-    market_forward = _compound_market_return(
-        start,
-        end,
-        context.market_returns,
-        context.calendar,
-    )
-    abnormal = forward_return - market_forward
+    mode = _label_mode(label_config)
+    if mode == "spy":
+        market_forward = _compound_market_return(
+            start,
+            end,
+            context.market_returns,
+            context.calendar,
+        )
+        abnormal = forward_return - market_forward
+        label_source = "future_returns_only"
+        details: dict[str, Any] = {"label_benchmark_return": market_forward}
+    elif mode in {"ff3", "ff4"}:
+        factor_result = _factor_adjusted_return(
+            start,
+            end,
+            forward_return,
+            context,
+            mode,
+            label_config,
+            pre_window,
+        )
+        if factor_result is None:
+            return None
+        abnormal, details = factor_result
+        label_source = "future_returns_and_factors_only"
+    else:
+        raise ValueError(f"Unknown label mode: {mode}")
     pre_returns = _trailing_values(
         context,
         context.ticker_returns,
@@ -391,7 +440,12 @@ def _label_vector(
     volume_jump = (
         0.0 if pre_volume_mean == 0 else float(np.mean(post_volume) / pre_volume_mean - 1.0)
     )
-    return np.asarray([abnormal, volatility_jump, volume_jump], dtype=np.float32)
+    return LabelVector(
+        values=np.asarray([abnormal, volatility_jump, volume_jump], dtype=np.float32),
+        source=label_source,
+        mode=mode,
+        details=details,
+    )
 
 
 def _metadata(event: dict[str, Any], control_type: str, start: date) -> np.ndarray:
@@ -440,12 +494,31 @@ def _control_dates(
     event: dict[str, Any],
     candidates: list[date],
     count: int,
+    horizon: int,
+    calendar: TradingCalendar,
 ) -> list[date]:
     if not candidates:
         return []
     offset = int(stable_id(event["event_id"], prefix="offset").split(":")[1], 16) % len(candidates)
     ordered = candidates[offset:] + candidates[:offset]
-    return ordered[:count]
+    selected: list[date] = []
+    selected_windows: list[tuple[date, date]] = []
+    for candidate in ordered:
+        try:
+            end = calendar.event_end_date(candidate, horizon)
+        except ValueError:
+            continue
+        if any(_windows_overlap(candidate, end, left, right) for left, right in selected_windows):
+            continue
+        selected.append(candidate)
+        selected_windows.append((candidate, end))
+        if len(selected) >= count:
+            break
+    return selected
+
+
+def _windows_overlap(left_start: date, left_end: date, right_start: date, right_end: date) -> bool:
+    return left_start <= right_end and right_start <= left_end
 
 
 def _trailing_values(
@@ -509,6 +582,93 @@ def _compound_market_return(
             break
         current = calendar.strictly_next_trading_day(current)
     return 0.0 if observed == 0 else total - 1.0
+
+
+def _factor_adjusted_return(
+    start: date,
+    end: date,
+    forward_return: float,
+    context: PriceContext,
+    mode: str,
+    label_config: dict[str, Any],
+    pre_window: int,
+) -> tuple[float, dict[str, Any]] | None:
+    factor_names = ("mkt_rf", "smb", "hml") if mode == "ff3" else ("mkt_rf", "smb", "hml", "mom")
+    factor_window = int(label_config.get("factor_estimation_window", max(60, pre_window)))
+    min_obs = int(label_config.get("min_factor_observations", max(len(factor_names) + 2, 20)))
+    start_idx = context.date_index.get(start)
+    if start_idx is None:
+        return None
+    estimation_dates = context.ordered_dates[max(0, start_idx - factor_window) : start_idx]
+    design_rows = []
+    target_rows = []
+    for day in estimation_dates:
+        factors = context.factor_returns.get(day)
+        ticker_return = context.ticker_returns.get(day)
+        if factors is None or ticker_return is None:
+            continue
+        values = _factor_values(factors, factor_names)
+        if values is None:
+            continue
+        design_rows.append([1.0, *values])
+        target_rows.append(ticker_return - factors.rf)
+    if len(target_rows) < min_obs:
+        return None
+    design = np.asarray(design_rows, dtype=float)
+    target = np.asarray(target_rows, dtype=float)
+    coefficients = np.linalg.lstsq(design, target, rcond=None)[0]
+    expected_total = 1.0
+    observed = 0
+    for day in _post_return_dates(start, end, context.calendar):
+        factors = context.factor_returns.get(day)
+        if factors is None:
+            return None
+        values = _factor_values(factors, factor_names)
+        if values is None:
+            return None
+        expected_excess = float(coefficients[0] + np.dot(coefficients[1:], np.asarray(values)))
+        expected_total *= 1.0 + factors.rf + expected_excess
+        observed += 1
+    if observed == 0:
+        return None
+    factor_expected = expected_total - 1.0
+    return (
+        forward_return - factor_expected,
+        {
+            "label_benchmark_return": factor_expected,
+            "label_factor_model": mode.upper(),
+            "label_factor_observations": len(target_rows),
+            "label_factor_window": factor_window,
+            "label_factor_min_observations": min_obs,
+        },
+    )
+
+
+def _factor_values(factors: FactorRow, factor_names: tuple[str, ...]) -> list[float] | None:
+    values = []
+    for name in factor_names:
+        value = getattr(factors, name)
+        if value is None:
+            return None
+        values.append(float(value))
+    return values
+
+
+def _post_return_dates(start: date, end: date, calendar: TradingCalendar) -> list[date]:
+    if start >= end:
+        return []
+    dates = []
+    current = calendar.strictly_next_trading_day(start)
+    while current <= end:
+        dates.append(current)
+        if current == end:
+            break
+        current = calendar.strictly_next_trading_day(current)
+    return dates
+
+
+def _label_mode(label_config: dict[str, Any]) -> str:
+    return str(label_config.get("mode", "spy")).lower()
 
 
 def _split_for_row(row: dict[str, Any], config: dict[str, Any]) -> int:

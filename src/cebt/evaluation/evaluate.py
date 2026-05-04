@@ -97,6 +97,13 @@ def evaluate_model(
         "control_rank_ic": _masked_rank_ic(predictions[:, 0], targets[:, 0], is_event < 0.5),
         "latent_jump_auc": _binary_auc(_row_abs_mean(latents), is_event),
         "latent_jump_paired_gap": _paired_event_control_gap(source_rows, _row_abs_mean(latents)),
+        "response_transport_auc": _transport_auc(deltas, is_event),
+        "volatility_transport_auc": _channel_transport_auc(deltas, is_event, channel=1),
+        "volume_transport_auc": _channel_transport_auc(deltas, is_event, channel=2),
+        "response_transport_paired_gap": _paired_event_control_gap(
+            source_rows,
+            _response_transport_score(deltas),
+        ),
         "mse_ci": bootstrap_ci(
             paired_values,
             _mse_from_paired_rows(targets.shape[1]),
@@ -128,6 +135,11 @@ def evaluate_model(
             ticker_groups,
             lambda rows: rank_ic(rows[:, 0], rows[:, 1]) or 0.0,
         ),
+        "rank_ic_leave_one_month_out": leave_one_group_out(
+            rank_values,
+            month_groups,
+            lambda rows: rank_ic(rows[:, 0], rows[:, 1]) or 0.0,
+        ),
         "mse_ci_month_cluster": clustered_bootstrap_ci(
             paired_values,
             month_groups,
@@ -141,6 +153,11 @@ def evaluate_model(
             lambda rows: rank_ic(rows[:, 0], rows[:, 1]) or 0.0,
             n_boot=1000,
             seed=int(config.get("seed", 7)) + 104,
+        ),
+        "rank_ic_by_month": _rank_ic_by_group(
+            rank_values,
+            month_groups,
+            seed=int(config.get("seed", 7)) + 105,
         ),
     }
     if outcome_logvars is not None:
@@ -173,6 +190,11 @@ def evaluate_model(
                 "target_volatility_jump": float(targets[local_idx, 1]),
                 "target_volume_jump": float(targets[local_idx, 2]),
                 "event_delta_abs_mean": float(np.mean(np.abs(deltas[local_idx]))),
+                "event_delta_abs_response_transport": float(
+                    _response_transport_score(deltas[local_idx : local_idx + 1])[0]
+                ),
+                "event_delta_abs_volatility": _optional_channel_abs(deltas, local_idx, 1),
+                "event_delta_abs_volume": _optional_channel_abs(deltas, local_idx, 2),
                 "latent_event_abs_mean": float(np.mean(np.abs(latents[local_idx]))),
             }
         )
@@ -287,6 +309,32 @@ def _row_abs_mean(values: np.ndarray) -> np.ndarray:
     return np.mean(np.abs(values), axis=1)
 
 
+def _response_transport_score(deltas: np.ndarray) -> np.ndarray:
+    if deltas.ndim != 2 or deltas.shape[1] < 2:
+        return _row_abs_mean(deltas)
+    return np.mean(np.abs(deltas[:, 1:]), axis=1)
+
+
+def _transport_auc(deltas: np.ndarray, labels: np.ndarray) -> float | None:
+    return _binary_auc(_response_transport_score(deltas), labels)
+
+
+def _channel_transport_auc(
+    deltas: np.ndarray,
+    labels: np.ndarray,
+    channel: int,
+) -> float | None:
+    if deltas.ndim != 2 or deltas.shape[1] <= channel:
+        return None
+    return _binary_auc(np.abs(deltas[:, channel]), labels)
+
+
+def _optional_channel_abs(deltas: np.ndarray, row_idx: int, channel: int) -> float | None:
+    if deltas.ndim != 2 or deltas.shape[1] <= channel:
+        return None
+    return float(abs(deltas[row_idx, channel]))
+
+
 def _masked_mse(predictions: np.ndarray, targets: np.ndarray, mask: np.ndarray) -> float | None:
     if not np.any(mask):
         return None
@@ -304,6 +352,35 @@ def _mse_from_paired_rows(target_dim: int):
         return mse(rows[:, :target_dim], rows[:, target_dim:])
 
     return metric
+
+
+def _rank_ic_by_group(
+    rank_values: np.ndarray,
+    groups: np.ndarray,
+    seed: int,
+    min_rows: int = 8,
+) -> list[dict[str, Any]]:
+    rows = []
+    for idx, group in enumerate(sorted({str(value) for value in groups.tolist()})):
+        mask = groups == group
+        if int(np.sum(mask)) < min_rows:
+            continue
+        group_values = rank_values[mask]
+        interval = bootstrap_ci(
+            group_values,
+            lambda values: rank_ic(values[:, 0], values[:, 1]) or 0.0,
+            n_boot=500,
+            seed=seed + idx,
+        )
+        rows.append(
+            {
+                "group": group,
+                "rows": int(np.sum(mask)),
+                "rank_ic": rank_ic(group_values[:, 0], group_values[:, 1]),
+                "rank_ic_ci": interval,
+            }
+        )
+    return rows
 
 
 def _row_gaussian_nll(
