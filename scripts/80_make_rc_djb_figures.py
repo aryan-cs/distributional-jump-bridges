@@ -469,7 +469,7 @@ def make_data_temporal_audit(path: Path) -> None:
         alpha=0.86,
         labels=["Real 8-K rows", "Matched controls"],
     )
-    for boundary, label in [("2023-12", "train"), ("2024-12", "validation")]:
+    for boundary, label in [("2023-12", "Train cutoff"), ("2024-12", "Validation cutoff")]:
         if boundary in month_to_x:
             bx = month_to_x[boundary] + 0.5
             ax.axvline(bx, color="#64748b", linewidth=0.9, linestyle="--")
@@ -504,50 +504,99 @@ def make_data_temporal_audit(path: Path) -> None:
 
     ax = axes[1]
     ax.set_facecolor("#fbfdff")
-    ax.axvspan(-0.25, 0.0, color="#fde2e2", alpha=0.58, zorder=0)
-    ax.axvline(0.0, color="#b91c1c", linewidth=0.9)
     ax.grid(True, axis="x", color="#e5edf4", linewidth=0.7, zorder=1)
-    y_lookup = {"same_ticker_no_event": 0, "real_event": 1}
-    xs: list[int] = []
-    ys: list[int] = []
-    counts: list[int] = []
-    for control_type, y_value in y_lookup.items():
-        for gap, count in sorted(gap_counts.get(control_type, {}).items()):
-            xs.append(gap)
-            ys.append(y_value)
-            counts.append(count)
-    count_array = np.asarray(counts, dtype=float)
-    size_array = 45 + 410 * count_array / float(count_array.max())
-    cmap = LinearSegmentedColormap.from_list(
-        "gap_counts",
-        ["#e9eef4", "#dceef2", "#bfe6d5", "#7fbf9f"],
+    gap_palette = {
+        1: "#9fd8cb",
+        2: "#d7c5ea",
+        3: "#b7d7f2",
+        4: "#f7c8a9",
+    }
+    y_lookup = {"Real 8-K rows": "real_event", "Matched controls": "same_ticker_no_event"}
+    gap_values = sorted({gap for bucket in gap_counts.values() for gap in bucket})
+    for y, (_label, control_type) in enumerate(y_lookup.items()):
+        total = sum(gap_counts[control_type].values())
+        left = 0.0
+        for gap in gap_values:
+            count = gap_counts[control_type].get(gap, 0)
+            percent = 100.0 * count / total if total else 0.0
+            if percent == 0.0:
+                continue
+            ax.barh(
+                y,
+                percent,
+                left=left,
+                height=0.42,
+                color=gap_palette.get(gap, "#e5e7eb"),
+                edgecolor="#334155",
+                linewidth=0.55,
+                zorder=3,
+            )
+            if percent >= 4.0:
+                ax.text(
+                    left + percent / 2,
+                    y,
+                    f"{gap}d\n{percent:.0f}%",
+                    ha="center",
+                    va="center",
+                    fontsize=7.2,
+                    color="#1f2937",
+                    linespacing=0.95,
+                )
+            left += percent
+        ax.text(
+            101.0,
+            y,
+            f"n={total:,}",
+            ha="left",
+            va="center",
+            fontsize=8,
+            color="#334155",
+        )
+    leakage_violations = sum(
+        count
+        for bucket in gap_counts.values()
+        for gap, count in bucket.items()
+        if gap <= 0
     )
-    scatter = ax.scatter(
-        xs,
-        ys,
-        s=size_array,
-        c=counts,
-        cmap=cmap,
-        edgecolors="#334155",
-        linewidths=0.55,
-        alpha=0.92,
-        zorder=3,
+    ax.text(
+        0.0,
+        1.48,
+        f"Leakage violations: {leakage_violations}",
+        ha="left",
+        va="center",
+        fontsize=8.4,
+        fontweight="semibold",
+        color="#166534",
+        bbox={"boxstyle": "round,pad=0.32", "facecolor": "#e5f6ef", "edgecolor": "#9fd8cb"},
     )
-    ax.set_yticks([0, 1], ["Matched controls", "Real 8-K rows"])
-    ax.set_xticks([0, 1, 2, 3, 4])
-    ax.set_xlim(-0.25, 4.45)
-    ax.set_ylim(-0.55, 1.55)
-    ax.set_xlabel("Calendar days between latest feature date and label-start date")
+    ax.set_yticks([0, 1], list(y_lookup))
+    ax.set_xlim(0.0, 109.0)
+    ax.set_ylim(-0.55, 1.70)
+    ax.set_xlabel("Share of rows by guard margin")
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:.0f}%"))
     ax.set_title(
-        "All feature windows close before labels begin",
+        "Feature-label guard margin distribution",
         loc="left",
         fontsize=10,
         fontweight="semibold",
     )
-    colorbar = fig.colorbar(scatter, ax=ax, orientation="vertical", pad=0.015, fraction=0.045)
-    colorbar.set_label("Rows in gap cell", fontsize=8)
-    colorbar.ax.tick_params(labelsize=7)
-    fig.subplots_adjust(bottom=0.12, top=0.92, left=0.16, right=0.94)
+    ax.legend(
+        handles=[
+            Patch(
+                facecolor=gap_palette.get(gap, "#e5e7eb"),
+                edgecolor="#334155",
+                linewidth=0.55,
+                label=f"{gap} calendar day{'s' if gap != 1 else ''}",
+            )
+            for gap in gap_values
+        ],
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.28),
+        ncol=len(gap_values),
+        frameon=False,
+        fontsize=8,
+    )
+    fig.subplots_adjust(bottom=0.18, top=0.92, left=0.16, right=0.95)
     _save(fig, path, dpi=260)
 
 
