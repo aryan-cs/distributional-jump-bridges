@@ -100,16 +100,30 @@ def test_pairwise_rank_loss_rewards_correct_ordering_on_events() -> None:
 
 
 def test_rank_weight_changes_total_loss() -> None:
-    config = CEBTConfig(
-        price_features=8, metadata_features=6, event_embedding_dim=16, hidden_dim=32, latent_dim=4
+    outputs = {
+        "prediction": torch.tensor(
+            [
+                [-0.30, 0.0, 0.0],
+                [0.20, 0.0, 0.0],
+                [-0.10, 0.0, 0.0],
+                [0.00, 0.0, 0.0],
+                [0.00, 0.0, 0.0],
+            ]
+        ),
+        "event_delta": torch.zeros(5, 3),
+        "z_event": torch.zeros(5, 4),
+        "mu": torch.zeros(5, 4),
+        "logvar": torch.zeros(5, 4),
+    }
+    targets = torch.tensor(
+        [
+            [0.30, 0.0, 0.0],
+            [-0.20, 0.0, 0.0],
+            [0.10, 0.0, 0.0],
+            [0.00, 0.0, 0.0],
+            [0.00, 0.0, 0.0],
+        ]
     )
-    model = build_model("cebt", config)
-    outputs = model(
-        torch.randn(5, 5, 8),
-        torch.randn(5, 16),
-        torch.randn(5, 6),
-    )
-    targets = torch.randn(5, 3)
     is_event = torch.tensor([1.0, 1.0, 1.0, 0.0, 0.0])
     base_loss, _ = cebt_loss(outputs, targets, is_event, LossWeights(rank_weight=0.0))
     rank_loss, metrics = cebt_loss(outputs, targets, is_event, LossWeights(rank_weight=0.5))

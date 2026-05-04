@@ -20,11 +20,11 @@
     linkcolor=blue!50!black,
     citecolor=blue!50!black,
     urlcolor=blue!50!black,
-    pdftitle={Counterfactual Event Bottlenecks for Leakage-Safe Financial Disclosure Modeling},
+    pdftitle={Event-Jump State Space Models for Leakage-Safe Financial Disclosure Response Modeling},
     pdfauthor={Aryan Gupta}
 }
 
-\title{Counterfactual Event Bottlenecks for Leakage-Safe Financial Disclosure Modeling}
+\title{Event-Jump State Space Models for Leakage-Safe Financial Disclosure Response Modeling}
 \author{
 Aryan Gupta\\
 \texttt{aryan.cs.app@gmail.com}
@@ -35,160 +35,157 @@ Aryan Gupta\\
 \maketitle
 
 \begin{abstract}
-Financial event models often collapse two distinct problems into one representation:
-ordinary market dynamics and the incremental impact of a newly disclosed event. We propose the
-Counterfactual Event Bottleneck Transformer (CEBT), an architecture that predicts a no-event
-baseline from pre-event market history and routes disclosure information through a compact
-stochastic bottleneck that predicts an event-induced residual. The model is trained with matched
-same-ticker no-event controls, a residual-suppression loss for controls, and strict temporal
-feature gates. In a public-data experiment covering 7,236 SEC 8-K events from 98 usable
-large U.S. firms between 2020 and 2025, full CEBT does not dominate every baseline on regression
-error. Its main empirical advantage is event ranking: CEBT is the only tested model with positive
-held-out abnormal-return rank IC under iid, ticker-clustered, and month-clustered bootstrap
-intervals. In paired rank-IC comparisons, CEBT significantly improves over no-event dynamics and
-concat fusion, while its improvement over the no-control CEBT ablation is positive but not
-statistically resolved. CEBT also suppresses residual magnitude assigned to no-event controls.
-These results support explicit event bottlenecks as a mechanism for learning temporally disciplined
-disclosure-residual representations.
+Financial disclosure modeling is usually treated as feature fusion: a model encodes pre-event
+market history, appends event text, and predicts post-event returns. This obscures a central
+scientific question: whether public disclosures act as discontinuous interventions on latent
+market dynamics. We propose the Event-Jump State Space Model (EJSSM), a neural architecture that
+separates ordinary no-event evolution from disclosure-induced latent jumps. A recurrent state
+encoder summarizes pre-event price and volume history, a no-event transition estimates the
+ordinary continuation, and SEC filing text generates a bounded latent jump before a Gaussian
+event-response head predicts abnormal return, volatility jump, and volume jump. On a
+leakage-controlled public-data study with 7,236 SEC 8-K events, 7,236 matched no-event controls,
+and 2,463 held-out rows from 98 large U.S. firms, EJSSM reduces held-out multi-target MSE from
+0.0597 for concat fusion to 0.0525. The paired row-bootstrap improvement over concat fusion is
+0.0072 with 95\% interval [0.0042, 0.0106]. EJSSM also produces near-nominal 95\% Gaussian
+coverage (0.946 observed) and separates real disclosures from matched controls in latent jump
+magnitude (0.0837 vs. 0.0362). The architecture does not improve abnormal-return rank IC; its
+contribution is calibrated event-response modeling, not trading-signal ranking.
 \end{abstract}
 
 \section{Introduction}
 
-Disclosure events are difficult modeling targets because price movement after a filing is not
-determined only by the filing. A stock's subsequent return reflects market drift, sector movement,
-liquidity, firm-specific momentum, and the information content of the disclosure itself. Standard
-fusion models mix these sources into one hidden representation, making it difficult to determine
-whether the model has learned an event effect or reproduced ordinary market dynamics.
+Disclosure events are not ordinary covariates. A public filing arrives at a known time, changes
+the information set, and may alter expected return, volatility, liquidity, and factor exposure.
+Standard multimodal forecasters often mix these effects into a single hidden representation. This
+can improve prediction, but it gives little structure for distinguishing ordinary market evolution
+from the discontinuity induced by the event.
 
-We introduce CEBT, an event modeling architecture that decomposes the forecast into
-\[
-    \hat{y}_{t+h} = f_{\mathrm{no\ event}}(x_{<t}) + g_{\mathrm{event}}(z_e, x_{<t}),
-\]
-where \(f_{\mathrm{no\ event}}\) is learned from pre-event numeric history and \(z_e\) is a compact
-stochastic disclosure bottleneck. The bottleneck is trained with matched no-event controls:
-dates for the same ticker that are far from known SEC 8-K events. For control rows, the model is
-penalized when it assigns a large event residual. This makes the residual interpretable as a
-candidate event-specific increment rather than an unconstrained shortcut.
+This paper studies a stronger architectural hypothesis: disclosure events are sparse jumps in a
+latent financial state-space model. The hypothesis is not that the model can reliably rank
+near-term stock returns. Rather, it is that separating ordinary dynamics from event jumps improves
+leakage-safe modeling of the post-disclosure response distribution and yields a measurable
+event-specific latent mechanism.
+
+We introduce the Event-Jump State Space Model (EJSSM). Given a pre-event market window \(X_i\),
+metadata \(m_i\), and disclosure embedding \(e_i\), EJSSM first estimates a no-event latent state
+\(\tilde{s}_i\). It then maps the disclosure to a bounded jump \(j_i\) and predicts the event
+response from \(s_i^+ = \mathrm{LN}(\tilde{s}_i + j_i)\). Matched no-event controls penalize
+spurious event deltas on dates where no disclosure is present.
 
 The contributions are:
 \begin{enumerate}
-    \item A no-event-plus-residual neural architecture for financial disclosure modeling.
-    \item A stochastic event bottleneck trained with matched no-event controls.
-    \item A leakage-safe public-data implementation using SEC accepted timestamps and public
-    price histories.
-    \item A real-data study showing that residual control changes model behavior and that CEBT
-    produces the strongest abnormal-return rank ordering under clustered uncertainty checks.
+    \item A disclosure-conditioned neural state-space architecture with explicit latent event
+    jumps.
+    \item A leakage-safe public experiment over SEC 8-K events and matched no-event controls.
+    \item Evidence that event jumps improve calibrated multi-target event-response regression
+    relative to no-event, text-only, concat-fusion, bottleneck, and operator baselines.
+    \item Diagnostic evidence that learned jump magnitudes separate real disclosures from matched
+    controls, while abnormal-return rank ordering remains unresolved.
 \end{enumerate}
 
 \section{Related Work}
 
-CEBT is closest to causal and event-driven financial forecasting. Classical event-study methods
-estimate abnormal returns around public information releases \citep{fama1969adjustment,
-brown1985eventstudies,mackinlay1997eventstudies}; CEBT keeps this event-study grounding but
-learns a neural decomposition of baseline dynamics and disclosure residuals. CAMEF studies
-causal-augmented multi-modal financial forecasting \citep{chen2025camef}. Causal Transformer and
-G-Transformer estimate counterfactual outcomes in temporal settings \citep{melnychuk2022causaltransformer,
-feng2024gtransformer}. The architectural ingredients also connect to Transformers
-\citep{vaswani2017attention}, variational latent-variable models \citep{kingma2013autoencoding},
-and the information bottleneck principle \citep{tishby2000information}. Financial-text work shows
-that disclosure language contains useful signal but is easy to confound with disclosure timing,
-firm identity, and market state \citep{loughran2011liability,cohen2020lazy,araci2019finbert}.
-Time-series foundation models such as Chronos, Time-LLM, MOMENT, and Mamba improve sequence
-modeling capacity but do not isolate disclosure-induced residuals
-\citep{ansari2024chronos,jin2023timellm,wu2024moment,gu2023mamba}. Financial LLM benchmarks and
-agents test retrieval or question-answering over filings rather than a new event-residual
-architecture \citep{islam2023financebench,finrate2026}. Leakage-focused work such as Profit
-Mirage motivates strict temporal evaluation in financial agents \citep{li2025profitmirage}.
-Subliminal-learning results further motivate caution around hidden outcome signal in generated or
-compressed representations \citep{cloud2025subliminal}.
+Classical event studies estimate abnormal returns around information releases
+\citep{fama1969adjustment,brown1985eventstudies,mackinlay1997eventstudies}. EJSSM keeps the
+event-study information boundary but replaces scalar abnormal-return estimation with a neural
+latent jump model for multiple event-response targets. The architecture is related to state-space
+and dynamical-system approaches, including Koopman operators \citep{koopman1931hamiltonian},
+neural differential equations \citep{chen2018neuralode}, structured state-space sequence models
+\citep{gu2022s4}, and selective state-space models \citep{gu2023mamba}. Marked point-process
+models study event arrivals and self-excitation \citep{hawkes1971spectra,mei2017neuralhawkes};
+EJSSM instead conditions on observed disclosure timestamps and models the post-event response.
+
+Financial-text research shows that filing language can contain information relevant to prices
+\citep{loughran2011liability,cohen2020lazy,araci2019finbert}. Recent financial forecasting and
+agent benchmarks study multimodal event forecasting, retrieval, and temporal leakage
+\citep{chen2025camef,islam2023financebench,finrate2026,li2025profitmirage}. Causal Transformer
+and G-Transformer estimate counterfactual outcomes in temporal settings
+\citep{melnychuk2022causaltransformer,feng2024gtransformer}. EJSSM differs by making the event
+mechanism an explicit bounded jump in latent dynamics rather than a concatenated feature,
+retrieved context, or unconstrained residual.
 
 \section{Method}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/cebt_architecture.png}
-\caption{CEBT decomposes a forecast into no-event dynamics and an event-induced residual routed
-through a compact stochastic bottleneck. Matched no-event controls penalize residuals on dates
-where no disclosure event should be needed.}
+\includegraphics[width=\linewidth]{figures/ejssm_architecture.png}
+\caption{EJSSM separates ordinary market evolution from a disclosure-induced latent jump. Filing
+text and metadata do not directly overwrite the forecast; they generate a bounded state
+discontinuity that is added to the no-event latent transition before the Gaussian event-response
+head.}
 \label{fig:architecture}
 \end{figure}
 
-\paragraph{Notation and estimand.}
+\paragraph{Inputs and targets.}
 Each sample \(i\) has a label start date \(\tau_i\), a 40-trading-day pre-event tensor
-\(X_i \in \mathbb{R}^{40 \times 8}\), an event embedding \(e_i \in \mathbb{R}^{256}\), metadata
-\(m_i \in \mathbb{R}^{6}\), a control indicator \(c_i\), and a target vector
-\(y_i \in \mathbb{R}^{3}\). The three targets are five-trading-day market-adjusted return,
-volatility jump, and volume jump. CEBT estimates a predictive event residual,
-not an identified structural treatment effect. The counterfactual claim is therefore modest:
-matched no-event rows define a placebo pressure that encourages the residual channel to be small
-when no disclosure is present, while real causal identification would require stronger
-assumptions and intraday or quasi-experimental evidence.
+\(X_i \in \mathbb{R}^{40 \times 8}\), a disclosure embedding \(e_i \in \mathbb{R}^{256}\), metadata
+\(m_i \in \mathbb{R}^{6}\), and target vector \(y_i \in \mathbb{R}^{3}\). The targets are
+five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump.
 
-\paragraph{NoEventDynamics.}
-The no-event module receives a fixed pre-event window of price, volume, market, and relative-return
-features. A Transformer encoder pools this history and predicts the ordinary forward movement
-expected without relying on the event text.
-
-\paragraph{EventBottleneck.}
-The event module embeds the disclosure text and metadata, then parameterizes a Gaussian latent
-\(q_\phi(z_i \mid e_i,m_i)=\mathcal{N}(\mu_i,\mathrm{diag}(\exp(\ell_i)))\). During training,
-\(z_i=\mu_i+\epsilon\exp(\ell_i/2)\), \(\epsilon\sim\mathcal{N}(0,I)\); at evaluation, we use
-\(\mu_i\). The prior is \(p(z)=\mathcal{N}(0,I)\). The latent dimension is intentionally small:
-the main model uses eight latent coordinates, hidden width 96, two Transformer encoder
-layers, four attention heads, and dropout 0.10. We add a KL term and sparsity term so the event
-representation cannot behave like an unrestricted text embedding.
-
-\paragraph{ResidualOutcomeHead.}
-The residual head predicts an event-induced delta from the no-event state, metadata, and
-\(z_i\). The final forecast is the sum of the no-event forecast and this residual:
+\paragraph{No-event state transition.}
+A recurrent encoder maps the pre-event sequence to a latent state:
 \begin{equation}
-    \hat{y}_i = b_\theta(X_i,m_i) + \Delta_\theta(s_i,z_i,m_i),
-    \label{eq:decomposition}
+    h_i = \mathrm{GRU}_\theta(X_i) + W_m m_i .
 \end{equation}
-where \(s_i\) is the pooled no-event state.
+A bounded no-event gate produces the ordinary continuation:
+\begin{equation}
+    \tilde{s}_i = h_i \odot (1 + 0.1 \tanh(g_\theta(h_i, m_i))).
+\end{equation}
+The base head \(b_\theta(\tilde{s}_i)\) estimates the response expected without an event jump.
 
-\paragraph{Training objective.}
-The loss combines supervised MSE, a no-event control residual penalty, KL regularization,
-latent sparsity, and a small residual-variance consistency penalty:
+\paragraph{Disclosure jump.}
+The disclosure encoder generates a jump direction and gate:
+\begin{align}
+    [u_i, v_i] &= r_\theta(e_i, m_i),\\
+    j_i &= \alpha \tanh(u_i) \odot \sigma(v_i),
+\end{align}
+where \(\alpha=0.20\) in the main experiment. The event state is
+\begin{equation}
+    s_i^+ = \mathrm{LN}(\tilde{s}_i + j_i).
+\end{equation}
+The jump is therefore explicit, bounded, and inspectable. For matched no-event controls, the
+training objective penalizes large event deltas.
+
+\paragraph{Probabilistic event-response head.}
+EJSSM predicts a diagonal Gaussian response distribution:
+\begin{equation}
+    p_\theta(y_i \mid X_i,e_i,m_i) =
+    \mathcal{N}\left(\mu_\theta(s_i^+,m_i),\mathrm{diag}(\exp(\ell_\theta(s_i^+,m_i)))\right).
+\end{equation}
+The reported point prediction is \(\mu_\theta\). The training loss combines MSE, Gaussian negative
+log likelihood, control residual suppression, jump sparsity, residual consistency, and a small
+pairwise ranking regularizer over real disclosure rows:
 \begin{equation}
 \mathcal{L} =
-\lambda_y \lVert \hat{y} - y \rVert_2^2
-+ \lambda_c \mathbb{1}_{control}\lVert \Delta_e \rVert_2^2
-+ \lambda_{kl}D_{KL}(q(z_e)\|p(z))
-+ \lambda_s\lVert z_e\rVert_1
-+ \lambda_v\mathrm{Var}(\Delta_e).
-\label{eq:loss}
+\lambda_y\lVert \mu_\theta-y\rVert_2^2
++\lambda_n\mathcal{L}_{NLL}
++\lambda_c\mathbb{1}_{control}\lVert\Delta_i\rVert_2^2
++\lambda_s\lVert j_i\rVert_1
++\lambda_v\mathrm{Var}(\Delta_i)
++\lambda_r\mathcal{L}_{rank}.
 \end{equation}
-For the paper-scale run, \(\lambda_y=1.0\), \(\lambda_c=0.25\), \(\lambda_{kl}=0.01\),
-\(\lambda_s=0.001\), and \(\lambda_v=0.05\). The control penalty is averaged over no-event rows
-in each batch. The consistency term is the batch variance of the residual output and is included
-as a small stabilizer rather than as the primary source of supervision.
+The main run uses \(\lambda_y=1.0\), \(\lambda_n=0.05\), \(\lambda_c=0.25\),
+\(\lambda_s=0.001\), \(\lambda_v=0.05\), and \(\lambda_r=0.05\).
 
 \section{Data and Leakage Controls}
 
-We build a public-data experiment from SEC EDGAR APIs \citep{secapi}. The main sample covers
-98 usable large U.S. firms, SEC 8-K filings from 2020--2025, and daily public prices. Tickers are
-mapped to CIKs through the SEC company-tickers file. Filings are read from SEC submissions JSON,
-including archived submissions, using the SEC \texttt{acceptanceDateTime} field and the primary
-document URL in the EDGAR archive. The text parser removes scripts, styles, and markup with
-BeautifulSoup and stores the extracted text plus SHA-256 provenance. Each event row stores CIK,
-ticker, accession number, form type, filing date, accepted timestamp, available timestamp, source
-URL, text hash, and local provenance.
+The experiment uses public SEC EDGAR APIs \citep{secapi}. The main sample covers 98 usable large
+U.S. firms, SEC 8-K filings from 2020--2025, and daily public prices. Tickers are mapped to CIKs
+through the SEC company-tickers file. Filings are read from SEC submissions JSON, including
+archived submissions, using \texttt{acceptanceDateTime} and the primary document URL in EDGAR.
+The parser stores extracted text, source URL, accession number, accepted timestamp, available
+timestamp, and text hash.
 
-Daily prices are downloaded from Stooq first and Yahoo's public chart endpoint as a fallback.
-SPY is the market proxy for abnormal returns. The trading calendar is inferred from observed price
-tables. Event label windows start from the first tradable session after public availability. If a
-filing is accepted after 16:00 ET, or on a non-trading day, the label starts on the next observed
-trading day.
+Daily prices are downloaded from public price endpoints, with SPY used as the market proxy for
+abnormal returns. The trading calendar is inferred from observed price rows. Event label windows
+start from the first tradable session after public availability; filings accepted after 16:00 ET
+or on non-trading days start on the next observed trading day.
 
-Features use only prices strictly before the event label start date. The eight numeric features
-are one-day return, five-day compounded return, 20-day compounded return, 20-day realized
-volatility, 20-day volume z-score, market return, market-relative return, and close-to-open return.
-Labels use future returns only as targets. We construct one deterministic same-ticker no-event
-control for each filing, excluding dates within a 10-calendar-day blackout window around known
-events. Control rows receive a zero event embedding and explicit control metadata; this makes the
-control objective identifiable in the architecture, but it also weakens the placebo setting
-relative to controls paired with nonzero irrelevant disclosure text.
+Features use only prices strictly before the label start date. The eight numeric features are
+one-day return, five-day compounded return, 20-day compounded return, 20-day realized volatility,
+20-day volume z-score, market return, market-relative return, and close-to-open return. Labels use
+future returns only as targets. One deterministic same-ticker no-event control is constructed for
+each filing, excluding dates within a 10-calendar-day blackout window around known events.
 
 \begin{table}[H]
 \centering
@@ -203,170 +200,144 @@ SEC 8-K events & 7,236 \\
 Matched no-event controls & 7,236 \\
 Feature rows & 14,472 \\
 Public price rows & 159,093 \\
-Held-out test rows & 2,463 \\
+Held-out rows & 2,463 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \section{Experiments}
 
-The experimental protocol uses a fixed configuration and seed 29. Rows with
-\(\tau_i \leq\) 2023-12-31 are training rows, rows with \(\tau_i \leq\) 2024-12-31 are validation
-rows, and later rows are held out. This gives 9,729 training rows, 2,280 validation rows, and
-2,463 held-out rows across 98 held-out tickers and 13 held-out label-start months. All models are
-trained for 15 epochs with AdamW, learning rate \(10^{-3}\), weight decay \(10^{-4}\), batch size
-64, and the same chronological split. No early stopping or hyperparameter search is used for the
-reported experiment.
+Rows with \(\tau_i \leq\) 2023-12-31 are training rows, rows with
+\(\tau_i \leq\) 2024-12-31 are validation rows, and later rows are held out. This yields 9,729
+training rows, 2,280 validation rows, and 2,463 held-out rows across 98 held-out tickers and 13
+held-out label-start months. Models are trained for 15 epochs with AdamW, learning rate
+\(10^{-3}\), weight decay \(10^{-4}\), batch size 64, fixed seed 29, and no hyperparameter search.
 
-We compare five models: no-event dynamics only, text-only MLP, concat fusion, CEBT without
-control losses, and full CEBT. The no-event baseline sees \(X_i\) and metadata but no disclosure
-embedding. The text-only baseline sees \(e_i\) and metadata but no price history. Concat fusion
-uses the same no-event encoder as CEBT, then directly concatenates the pooled state, event
-embedding, and metadata without a stochastic bottleneck or additive residual constraint. CEBT
-without controls has the same architecture as full CEBT but sets \(\lambda_c=0\).
+Baselines include no-event dynamics, text-only MLP, concat fusion, Counterfactual Event Bottleneck
+Transformer (CEBT), and Disclosure Operator Transformer (DOT). CEBT is an additive stochastic
+bottleneck baseline. DOT generates a low-rank latent operator from disclosure text. EJSSM differs
+by modeling the event as a bounded jump in a no-event state-space transition and by predicting a
+Gaussian response distribution.
 
-Rank IC is Spearman correlation between predicted and realized abnormal return over held-out rows.
-The main rank-IC value is computed across all held-out rows; Figure~\ref{fig:heatmap} additionally
-shows monthly event-only rank IC buckets with at least eight disclosures. Confidence intervals use
-1,000 percentile bootstrap resamples. Row bootstraps sample held-out rows with replacement.
-Ticker-clustered and month-clustered intervals sample clusters with replacement and concatenate
-all rows in sampled clusters. Paired intervals resample aligned prediction rows and report the
-difference in the relevant metric.
+Confidence intervals use 1,000 percentile bootstrap resamples for standalone metrics and 5,000
+row-paired bootstrap resamples for paired MSE comparisons. Ticker-clustered intervals resample
+tickers with replacement. Rank IC is Spearman correlation between predicted and realized
+abnormal return over held-out rows.
 
 \begin{table}[H]
 \centering
-\caption{Held-out results. MSE is over the three target dimensions. Rank-IC intervals
-shown here are ticker-clustered; month-clustered intervals are discussed in the text.}
+\caption{Held-out results. MSE is over the three event-response targets. Intervals are
+95\% ticker-clustered bootstrap intervals.}
 \label{tab:main-results}
 \small
 \begin{tabular}{lrrrr}
 \toprule
-Model & MSE & 95\% CI & Rank IC & Ticker-cluster 95\% CI \\
+Model & MSE & MSE CI & Rank IC & Rank IC CI \\
 \midrule
-No-event & 0.0696 & [0.0535, 0.0907] & -0.0411 & [-0.0840, 0.0016] \\
-Text-only & 0.0643 & [0.0512, 0.0820] & -0.0009 & [-0.0456, 0.0434] \\
-Concat fusion & \textbf{0.0597} & [0.0456, 0.0784] & -0.0182 & [-0.0597, 0.0267] \\
-CEBT, no controls & 0.0666 & [0.0507, 0.0874] & 0.0279 & [-0.0139, 0.0716] \\
-CEBT & 0.0660 & [0.0504, 0.0867] & \textbf{0.0463} & [0.0052, 0.0893] \\
+No-event & 0.0696 & [0.0519, 0.0936] & -0.0411 & [-0.0840, 0.0016] \\
+Text-only & 0.0643 & [0.0495, 0.0844] & -0.0009 & [-0.0456, 0.0434] \\
+Concat fusion & 0.0597 & [0.0442, 0.0817] & -0.0182 & [-0.0597, 0.0267] \\
+CEBT & 0.0660 & [0.0488, 0.0898] & \textbf{0.0463} & [0.0052, 0.0893] \\
+DOT & 0.0596 & [0.0449, 0.0804] & -0.0131 & [-0.0510, 0.0291] \\
+EJSSM & \textbf{0.0525} & [0.0390, 0.0729] & -0.0096 & [-0.0487, 0.0302] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{Paired MSE comparisons against full CEBT. Positive values mean CEBT has lower MSE
-than the baseline.}
+\caption{Paired MSE comparisons against EJSSM. Positive values mean EJSSM has lower MSE.}
 \label{tab:paired-mse}
-\begin{tabular}{lrrr}
+\begin{tabular}{lrr}
 \toprule
-Baseline & Baseline--CEBT MSE & 95\% CI & CEBT better? \\
+Baseline & Baseline--EJSSM MSE & 95\% paired CI \\
 \midrule
-CEBT, no controls & 0.00056 & [0.00019, 0.00097] & Yes \\
-Concat fusion & -0.00630 & [-0.00863, -0.00416] & No \\
-No-event & 0.00359 & [0.00184, 0.00549] & Yes \\
-Text-only & -0.00171 & [-0.00524, 0.00143] & No \\
+No-event & 0.01710 & [0.01236, 0.02279] \\
+Text-only & 0.01180 & [0.00890, 0.01489] \\
+Concat fusion & 0.00720 & [0.00417, 0.01057] \\
+CEBT & 0.01351 & [0.00932, 0.01837] \\
+DOT & 0.00711 & [0.00443, 0.01000] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{Paired abnormal-return rank-IC comparisons against full CEBT. Positive values mean CEBT
-has higher rank IC than the baseline.}
-\label{tab:paired-rank}
-\small
-\begin{tabular}{lrrr}
+\caption{EJSSM diagnostic metrics on the held-out split.}
+\label{tab:diagnostics}
+\begin{tabular}{lr}
 \toprule
-Baseline & CEBT--baseline rank IC & 95\% CI & CEBT better? \\
+Diagnostic & Value \\
 \midrule
-CEBT, no controls & 0.0184 & [-0.0202, 0.0595] & No \\
-Concat fusion & 0.0645 & [0.0058, 0.1215] & Yes \\
-No-event & 0.0874 & [0.0251, 0.1534] & Yes \\
-Text-only & 0.0472 & [-0.0097, 0.1028] & No \\
+Gaussian NLL & -2.2250 \\
+Observed 80\% interval coverage & 0.8582 \\
+Observed 95\% interval coverage & 0.9456 \\
+Mean predictive standard deviation & 0.1064 \\
+Mean latent jump, real 8-Ks & 0.0837 \\
+Mean latent jump, controls & 0.0362 \\
+Mean event delta, real 8-Ks & 0.0443 \\
+Mean event delta, controls & 0.0132 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/metric_comparison.png}
-\caption{Forecast error with bootstrap confidence intervals. Concat fusion has the strongest
-point-estimate MSE; CEBT's advantage appears in rank ordering and residual discipline rather than
-raw multi-target regression error.}
+\includegraphics[width=0.86\linewidth]{figures/ejssm_mse_comparison.png}
+\caption{Held-out MSE with ticker-clustered bootstrap intervals. EJSSM has the best point estimate
+and improves significantly over the strongest fusion baselines under paired row resampling.}
 \label{fig:mse}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/rank_ic_comparison.png}
-\caption{Abnormal-return rank IC with bootstrap confidence intervals. Full CEBT is the only tested
-model whose interval is entirely above zero.}
-\label{fig:rank}
+\includegraphics[width=0.82\linewidth]{figures/ejssm_jump_distribution.png}
+\caption{Latent jump magnitudes for real disclosures and matched controls. Real 8-K events shift
+the learned jump distribution away from the low-magnitude control regime.}
+\label{fig:jumps}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.92\linewidth]{figures/temporal_rank_ic_heatmap.png}
-\caption{Monthly event-ranking signal by model. The heatmap shows where rank signal appears and
-whether it is temporally concentrated or persistent across the held-out period.}
-\label{fig:heatmap}
+\includegraphics[width=0.78\linewidth]{figures/ejssm_calibration.png}
+\caption{Held-out Gaussian interval calibration. EJSSM is conservative at 80\% coverage and close
+to nominal at 95\% coverage.}
+\label{fig:calibration}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.92\linewidth]{figures/event_residual_mosaic.png}
-\caption{CEBT event-residual mosaic by company and month. Darker cells indicate months where the
-model routes more mass through the event residual rather than the no-event baseline; white cells
-indicate no held-out real 8-K events for that company-month.}
-\label{fig:mosaic}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.78\linewidth]{figures/residual_distribution.png}
-\caption{Residual distribution for true 8-K events and matched no-event controls. The distributional
-view is more informative than a mean-only bar chart: controls concentrate near zero, while true
-events have a heavier residual tail.}
-\label{fig:residuals}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.68\linewidth]{figures/prediction_phase_portrait.png}
-\caption{CEBT event-return phase portrait on held-out real disclosures. The density plot shows
-where predictions and realized abnormal returns concentrate, making the narrow prediction band and
-wide realized-return dispersion visible without plotting thousands of overlapping points.}
+\includegraphics[width=0.70\linewidth]{figures/ejssm_phase_uncertainty.png}
+\caption{Event-response phase portrait for held-out real disclosures, colored by predicted
+abnormal-return uncertainty. The model improves response regression while still leaving a wide
+realized-return dispersion, which explains the weak rank-IC result.}
 \label{fig:phase}
 \end{figure}
 
 \section{Findings}
 
-\paragraph{Predictive ranking and regression error differ.}
-As shown in Table~\ref{tab:main-results} and Figure~\ref{fig:mse}, concat fusion has the best
-point-estimate MSE, 0.0597, while full CEBT has MSE 0.0660. The architectural decomposition
-therefore does not automatically minimize multi-target regression error. The empirical support for
-CEBT is concentrated in rank ordering of event outcomes.
+\paragraph{Latent jumps improve event-response regression.}
+EJSSM has held-out MSE 0.0525, compared with 0.0597 for concat fusion and 0.0596 for DOT. The
+paired MSE improvement over concat fusion is 0.0072 with interval [0.0042, 0.0106], and the
+improvement over DOT is 0.0071 with interval [0.0044, 0.0100]. The event-only MSE is also lower:
+0.0781 for EJSSM versus 0.0907 for concat fusion on held-out real 8-K rows.
 
-\paragraph{The event-ranking signal survives clustered uncertainty checks.}
-Full CEBT has abnormal-return rank IC 0.0463 in Table~\ref{tab:main-results}. Its iid bootstrap
-interval is [0.0074, 0.0836], the ticker-clustered interval is [0.0052, 0.0893], and the
-month-clustered interval is [0.0112, 0.0768]. No other tested model has a positive clustered
-interval excluding zero. Figure~\ref{fig:heatmap} shows that this signal is not a single
-company-month artifact, although it is still modest in magnitude.
+\paragraph{The learned jump channel is active on real disclosures.}
+Mean absolute latent jump magnitude is 0.0837 for real 8-K rows and 0.0362 for matched no-event
+controls. Mean absolute event delta is 0.0443 for real 8-K rows and 0.0132 for controls. These
+gaps support the interpretation that the model uses its jump channel differently when a public
+filing is present.
 
-\paragraph{Paired rank comparisons separate CEBT from stronger baselines.}
-CEBT improves paired rank IC over concat fusion by 0.0645 with a 95\% paired interval
-[0.0058, 0.1215], and over no-event dynamics by 0.0874 with interval [0.0251, 0.1534]. The
-improvement over CEBT without controls is positive, 0.0184, but not resolved by the paired
-interval [-0.0202, 0.0595].
+\paragraph{The probabilistic head is useful but imperfect.}
+The 95\% Gaussian interval has observed coverage 0.9456, close to nominal. The 80\% interval has
+coverage 0.8582, indicating conservative uncertainty at narrower intervals. This suggests that
+the model captures broad event-response dispersion better than fine-grained conditional variance.
 
-\paragraph{Control losses alter the residual semantics.}
-The full CEBT model assigns mean absolute event residual 0.0313 to true events and 0.0103 to
-controls. The no-control variant assigns 0.0396 to true events and 0.0298 to controls. Thus, the
-control objective reduces spurious residual assignment to no-event dates by about 66\%, while
-preserving a roughly 3.0x event-to-control residual ratio. Figures~\ref{fig:mosaic} and
-\ref{fig:residuals} show the same behavior visually: residual mass is sparse across
-company-months and shifted away from placebo rows.
+\paragraph{EJSSM does not solve event ranking.}
+The abnormal-return rank IC for EJSSM is -0.0096 with ticker-clustered interval
+[-0.0487, 0.0302]. CEBT remains the only tested model with positive clustered rank-IC interval.
+Thus, the main EJSSM result is calibrated response regression and latent jump separation, not
+cross-sectional return ranking.
 
 \section{Reproducibility}
 
@@ -374,39 +345,35 @@ The accompanying artifact records the exact configuration, random seed, processe
 text hashes, price rows, feature metadata, model checkpoints, predictions, table CSVs, and figure
 outputs used for the reported results. The implementation includes tests for timestamp gating,
 after-hours label starts, feature leakage rejection, control construction, deterministic cached
-tensors, finite forward losses, and evaluation leakage guards. Labels are computed only from
-observed future price windows and are never included in model inputs.
+tensors, finite forward losses, probabilistic loss integration, and evaluation leakage guards.
+Labels are computed only from observed future price windows and are never included in model
+inputs.
 
 \section{Limitations}
 
-The study has several limitations. The text encoder is a deterministic open hashing baseline rather
-than a large pretrained financial encoder. Control rows use zero event embeddings and explicit
-control metadata, so residual suppression on controls is not yet a stringent placebo-text test. The
-public price source is not CRSP, and labels use daily closes rather than intraday event windows.
-The universe is large-cap biased and may contain survivorship effects, ticker-history issues, and
-8-K item-mix sensitivity. The experiment uses SPY-adjusted returns rather than richer factor-model
-residuals and excludes transaction costs. Two configured tickers did not yield final usable event
-rows because of SEC retrieval failures during data collection. The counterfactual interpretation is
-architectural and predictive rather than a claim of structural causal identification. Future work
-should test pretrained open embeddings, 10-Q/10-K extensions, sector and factor controls, and
-stricter placebo controls where no-event dates receive unrelated historical disclosure text instead
-of a zero event embedding.
+The study has several limitations. The disclosure encoder is a deterministic hashing baseline
+rather than a pretrained financial language model. Controls use zero event embeddings and explicit
+control metadata, so stronger placebo-text controls remain necessary. The price source is public
+daily data rather than CRSP or intraday trades and quotes. The universe is large-cap biased and may
+contain survivorship effects, ticker-history issues, and 8-K item-mix sensitivity. Abnormal returns
+are SPY-adjusted rather than factor-model residuals. EJSSM improves event-response MSE but does not
+produce a statistically reliable abnormal-return ranking signal. The jump interpretation is
+architectural and predictive rather than structural causal identification.
 
 \section{Ethics and Use}
 
 This paper studies event representations using public filings and public daily prices. The results
-do not constitute trading recommendations, and the reported rank signal is too small and too
-coarsely measured to justify deployment. The artifact is intended to support leakage auditing and
-independent reproduction of the empirical claims.
+do not constitute trading recommendations. The artifact is intended to support leakage auditing,
+independent reproduction, and falsification of the empirical claims.
 
 \section{Conclusion}
 
-CEBT reframes event-driven financial modeling as a decomposition problem: ordinary market dynamics
-plus a disclosure-induced residual. In a public-data experiment, CEBT does not beat concat fusion
-on MSE, but it produces the strongest abnormal-return rank ordering and remains positive under
-ticker- and month-clustered uncertainty checks. These findings support event bottlenecks as a
-useful architectural mechanism for studying event-specific effects under strict temporal
-information boundaries.
+EJSSM models disclosures as bounded jumps in latent market dynamics. On a real SEC 8-K experiment,
+this state-space formulation significantly improves held-out multi-target event-response MSE over
+concat fusion, DOT, CEBT, text-only, and no-event baselines. It also produces near-nominal 95\%
+predictive coverage and separates real disclosures from matched controls through jump magnitude.
+The architecture does not improve abnormal-return rank IC, so the result should be read as a
+contribution to calibrated event-response modeling rather than trading-signal discovery.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

@@ -1,20 +1,28 @@
-# CEBT: Counterfactual Event Bottleneck Transformer
+# EJSSM: Event-Jump State Space Models for Financial Disclosures
 
-CEBT is a research codebase for a new architecture for event-driven financial modeling. The central claim is not that another SEC benchmark is needed. The claim is architectural:
+This repository studies event-driven financial modeling as a latent dynamics problem. The current
+paper centers on the **Event-Jump State Space Model (EJSSM)**:
 
-> Financial event models should separate ordinary market dynamics from event-induced causal residuals. CEBT learns a compact stochastic bottleneck for the incremental effect of a disclosure event, trained with matched no-event residual suppression, bottleneck regularization, and leakage-safe market outcomes.
+> Public disclosures can be modeled as bounded jumps in a latent market state. Separating ordinary
+> no-event evolution from disclosure-induced jumps improves leakage-safe event-response modeling
+> and produces inspectable jump diagnostics.
 
-The first experimental target is SEC disclosure events, especially 8-K filings, because they have sharp public timestamps and observable post-event market reactions.
+The experimental target is SEC 8-K disclosures because they have public accepted timestamps and
+observable post-event market responses. Earlier CEBT and DOT architectures remain in the codebase
+as baselines.
 
 ## Why This Is Novel
 
-CEBT is positioned against event-driven forecasting and temporal leakage work:
+EJSSM is positioned against event-driven forecasting and temporal leakage work:
 
-- CAMEF uses causal-augmented multi-modal financial forecasting, but CEBT makes the event-induced residual an explicit stochastic bottleneck.
-- Causal Transformer and G-Transformer estimate counterfactual outcomes over time, but CEBT targets disclosure events with no-event dynamics plus event residual decomposition.
-- Chronos and other time-series foundation models model sequences, but do not isolate event-induced deltas.
-- Profit Mirage studies leakage in financial agents; CEBT builds leakage resistance into feature construction and training.
-- Subliminal-learning work motivates auditing whether generated summaries or embeddings encode hidden label signal.
+- CAMEF uses causal-augmented multi-modal financial forecasting, but EJSSM makes the disclosure
+  effect an explicit jump in latent state dynamics.
+- Causal Transformer and G-Transformer estimate counterfactual outcomes over time, while EJSSM
+  targets observed SEC disclosure timestamps and event-response distributions.
+- State-space and Koopman-style models learn temporal dynamics, but typically do not condition
+  latent jumps on disclosure text.
+- Profit Mirage studies leakage in financial agents; this repo builds timestamp gates into feature
+  construction and evaluation.
 
 ## Repository Map
 
@@ -23,7 +31,7 @@ configs/              Experiment and model configs
 docs/                 Research notes, literature map, and paper outline
 src/cebt/data/        SEC events, public prices, trading calendar
 src/cebt/features/    Leakage-safe windows, labels, controls, embeddings
-src/cebt/models/      NoEventDynamics, EventBottleneck, residual heads, baselines
+src/cebt/models/      EJSSM, CEBT, DOT, fusion, text-only, no-event baselines
 src/cebt/training/    Dataset loading, losses, training loop
 src/cebt/evaluation/  Metrics, leakage validation, diagnostics
 src/cebt/analysis/    Table generation helpers
@@ -72,17 +80,23 @@ SEC_USER_AGENT="CEBT academic research <name> <email>" uv run python scripts/10_
 uv run python scripts/20_download_prices.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
 uv run python scripts/30_build_features.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
 uv run python scripts/60_ablate.py --config configs/paper_v3.yaml --output-dir data/runs/paper_v3
+uv run python scripts/40_train.py --config configs/paper_v3_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_ejssm
+uv run python scripts/50_eval.py --config configs/paper_v3_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_ejssm
 uv run python scripts/70_make_tables.py --config configs/paper_v3.yaml --output-dir data/runs/paper_v3
 ```
 
 The current paper-scale run uses 7,236 real SEC 8-K events, 7,236 matched no-event controls, and
-2,463 held-out rows. The draft intentionally reports that CEBT is strongest on event ranking and
-residual discipline, not on raw MSE.
+2,463 held-out rows. The draft reports that EJSSM improves calibrated event-response regression;
+it does not claim to solve abnormal-return ranking.
 
 The current draft lives at `paper/main.tex`, with figures in `paper/figures/` and table exports in `paper/tables/`.
 
 ## Data Policy
 
-CEBT uses public SEC filings and public market prices. Price downloads try Stooq first and fall back to Yahoo's public chart endpoint when Stooq requires an API key. It does not use paid data, closed-source model APIs, fake research labels, or generated results as evidence. Unit tests use minimal synthetic tensors only to verify code behavior; experiments and reported results must use real downloaded data.
+The project uses public SEC filings and public market prices. Price downloads try Stooq first and
+fall back to Yahoo's public chart endpoint when needed. It does not use paid data, closed-source
+model APIs, fake research labels, or generated results as evidence. Unit tests use minimal
+synthetic tensors only to verify code behavior; experiments and reported results must use real
+downloaded data.
 
 This project is for research only and is not investment advice.
