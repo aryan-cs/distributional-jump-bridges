@@ -1,25 +1,27 @@
-# RC-DJB: Return-Conservative Disclosure Jump Bridges
+# DJB: Distributional Jump Bridges for Financial Disclosure Response Modeling
 
 This repository studies event-driven financial modeling as a latent distribution-transport problem.
-The current paper centers on the **Return-Conservative Distributional Jump Bridge (RC-DJB)**:
+The current paper centers on **Distributional Jump Bridges (DJB)** and analyzes a
+return-conservative variant as a targeted diagnostic:
 
 > Public disclosures should transport response risk, liquidity, and uncertainty, but should not
 > directly overwrite the no-event abnormal-return mean unless the evidence supports that path.
-> A return-mean firewall recovers statistically positive held-out rank IC while preserving
-> leakage-safe response-regression gains over fusion baselines.
+> The bridge improves leakage-safe response-regression error over fusion baselines, while the
+> return-conservative variant isolates the effect of blocking direct return-mean transport.
 
 The experimental target is SEC 8-K disclosures because they have public accepted timestamps and
-observable post-event market responses. Earlier CEBT and DOT architectures remain in the codebase
-as baselines; EJSSM and unconstrained DJB are stronger state/bridge baselines.
+observable post-event market responses. The codebase keeps several internal baselines for controlled
+comparison, including fusion, bottleneck, operator, state-jump, and unconstrained bridge variants.
 
 ## Why This Is Novel
 
-RC-DJB is positioned against event-driven forecasting and temporal leakage work:
+DJB is positioned against event-driven forecasting and temporal leakage work:
 
-- CAMEF uses causal-augmented multi-modal financial forecasting, but RC-DJB makes the disclosure
+- CAMEF uses causal-augmented multi-modal financial forecasting, but DJB makes the disclosure
   effect a constrained transport from a no-event distribution to an event-response distribution.
-- Causal Transformer and G-Transformer estimate counterfactual outcomes over time, while RC-DJB
-  targets observed SEC disclosure timestamps with a hard return-mean conservation constraint.
+- Causal Transformer and G-Transformer estimate counterfactual outcomes over time, while DJB targets
+  observed SEC disclosure timestamps and explicitly decomposes no-event dynamics from disclosure
+  response transport.
 - State-space and Koopman-style models learn temporal dynamics, but typically do not test whether
   disclosure text should be blocked from directly shifting return means.
 - Profit Mirage studies leakage in financial agents; this repo builds timestamp gates into feature
@@ -30,12 +32,7 @@ RC-DJB is positioned against event-driven forecasting and temporal leakage work:
 ```text
 configs/              Experiment and model configs
 docs/                 Research notes, literature map, and paper outline
-src/cebt/data/        SEC events, public prices, trading calendar
-src/cebt/features/    Leakage-safe windows, labels, controls, embeddings
-src/cebt/models/      EJSSM, CEBT, DOT, fusion, text-only, no-event baselines
-src/cebt/training/    Dataset loading, losses, training loop
-src/cebt/evaluation/  Metrics, leakage validation, diagnostics
-src/cebt/analysis/    Table generation helpers
+src/                 Python package for data, features, models, training, evaluation, and analysis
 scripts/              Config-driven pipeline entrypoints
 tests/                Unit and smoke tests
 paper/                Paper draft assets
@@ -78,7 +75,7 @@ For the paper-scale run used by the current draft, first build the public SEC/pr
 the deterministic baseline tables:
 
 ```bash
-SEC_USER_AGENT="CEBT academic research <name> <email>" uv run python scripts/10_build_events.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
+SEC_USER_AGENT="DJB academic research <name> <email>" uv run python scripts/10_build_events.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
 uv run python scripts/20_download_prices.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
 uv run python scripts/30_build_features.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
 uv run python scripts/60_ablate.py --config configs/paper_v3.yaml --output-dir data/runs/paper_v3
@@ -101,7 +98,7 @@ uv run python scripts/50_eval.py --config configs/paper_v3_bge_rc_djb.yaml --mod
 uv run python scripts/50_eval.py --config configs/paper_v3_bge_rc_djb.yaml --model-name rc_djb --output-dir data/runs/paper_v3_bge_rc_djb_best --intervention shuffle_event
 ```
 
-For the BGE-EJSSM comparison run:
+For the BGE state-jump comparison run:
 
 ```bash
 uv run python scripts/40_train.py --config configs/paper_v3_bge_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_bge_ejssm_balanced
@@ -112,9 +109,10 @@ uv run python scripts/50_eval.py --config configs/paper_v3_bge_ejssm.yaml --mode
 ```
 
 The current paper-scale run uses 7,236 real SEC 8-K events, 7,236 matched no-event controls, and
-2,463 held-out rows. The draft reports that RC-DJB recovers statistically positive held-out
-abnormal-return rank IC while improving event-response MSE over concat and DOT baselines. It does
-not claim to be a trading system or to dominate every MSE-only ablation.
+2,463 held-out rows. The draft reports that DJB improves event-response MSE over concat and
+operator-fusion baselines, and uses the return-conservative variant to audit how blocking direct
+return-mean transport changes the learned response distribution. It does not claim to be a trading
+system or to dominate every MSE-only ablation.
 
 The current draft lives at `paper/main.tex`, the compiled PDF is `paper/main.pdf`, figures are in
 `paper/figures/`, and table exports are in `paper/tables/`.

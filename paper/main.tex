@@ -362,9 +362,10 @@ fixed seed 29. The chronological split follows time-series evaluation practice, 
 observations must not influence model selection or feature construction \citep{bergmeir2012use,
 hyndman2021forecasting,lopezdeprado2018advances}.
 
-Baselines include no-event dynamics, text-only MLP, concat fusion, Counterfactual Event Bottleneck
-Transformer (CEBT), Disclosure Operator Transformer (DOT), Event-Jump State Space Model (EJSSM),
-and an unconstrained Distributional Jump Bridge (DJB). The No-event baseline is trained on the same
+Baselines include no-event dynamics, text-only MLP, concat fusion, a stochastic event-bottleneck
+baseline, a low-rank disclosure-operator baseline, an event-jump state-space baseline with BGE
+embeddings, and an unconstrained Distributional Jump Bridge (DJB). The No-event baseline is trained
+on the same
 chronological event/control rows and event-window labels as the other models; it removes disclosure
 text rather than changing the training substrate. Confidence intervals use percentile
 bootstrap resampling; ticker-clustered intervals resample tickers with replacement
@@ -447,9 +448,9 @@ Model & MSE & MSE CI & Rank IC & Rank IC CI \\
 \midrule
 No-event & 0.0695 & [0.0517, 0.0933] & -0.0393 & [-0.0886, 0.0064] \\
 Concat fusion & 0.0666 & [0.0499, 0.0886] & 0.0007 & [-0.0422, 0.0389] \\
-CEBT & 0.0696 & [0.0524, 0.0923] & -0.0295 & [-0.0752, 0.0160] \\
-DOT & 0.0698 & [0.0526, 0.0926] & -0.0043 & [-0.0487, 0.0422] \\
-EJSSM-BGE & 0.0566 & [0.0406, 0.0788] & 0.0254 & [-0.0107, 0.0633] \\
+Event bottleneck & 0.0696 & [0.0524, 0.0923] & -0.0295 & [-0.0752, 0.0160] \\
+Disclosure operator & 0.0698 & [0.0526, 0.0926] & -0.0043 & [-0.0487, 0.0422] \\
+Event-jump SSM & 0.0566 & [0.0406, 0.0788] & 0.0254 & [-0.0107, 0.0633] \\
 DJB & \textbf{0.0552} & [0.0396, 0.0773] & \textbf{0.0330} & [-0.0042, 0.0710] \\
 RC-DJB & 0.0562 & [0.0404, 0.0783] & 0.0154 & [-0.0288, 0.0559] \\
 \bottomrule
@@ -468,9 +469,9 @@ Baseline & MSE Diff. & 95\% CI & Rank IC Diff. & 95\% CI \\
 \midrule
 No-event & 0.01424 & [0.01145, 0.01765] & 0.0722 & [0.0204, 0.1293] \\
 Concat fusion & 0.01140 & [0.00919, 0.01353] & 0.0323 & [-0.0214, 0.0875] \\
-CEBT & 0.01443 & [0.01182, 0.01727] & 0.0625 & [0.0144, 0.1151] \\
-DOT & 0.01459 & [0.01200, 0.01735] & 0.0372 & [-0.0257, 0.0993] \\
-EJSSM-BGE & 0.00136 & [0.00085, 0.00188] & 0.0076 & [-0.0192, 0.0370] \\
+Event bottleneck & 0.01443 & [0.01182, 0.01727] & 0.0625 & [0.0144, 0.1151] \\
+Disclosure operator & 0.01459 & [0.01200, 0.01735] & 0.0372 & [-0.0257, 0.0993] \\
+Event-jump SSM & 0.00136 & [0.00085, 0.00188] & 0.0076 & [-0.0192, 0.0370] \\
 RC-DJB & 0.00097 & [0.00052, 0.00146] & 0.0176 & [-0.0174, 0.0557] \\
 \bottomrule
 \end{tabular}
@@ -633,7 +634,8 @@ rather than a single unconstrained fusion head.}
 \paragraph{Distributional bridging is the main predictive gain.}
 After aligning the firm and market return windows, DJB obtains the best multi-target MSE
 (0.0552) and the strongest point Rank IC (0.0330). Paired comparisons show lower MSE than every
-baseline, including concat fusion by 0.0114 [0.0092, 0.0135], EJSSM-BGE by 0.0014
+baseline, including concat fusion by 0.0114 [0.0092, 0.0135], the event-jump state-space baseline
+by 0.0014
 [0.0009, 0.0019], and RC-DJB by 0.0010 [0.0005, 0.0015]. The gain is therefore not just a
 different training substrate; it is the learned residual distributional bridge.
 

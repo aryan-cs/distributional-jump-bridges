@@ -30,8 +30,8 @@ RCDJB_SHUFFLED_TEXT_PATH = Path(
 
 MONTHLY_PREDICTION_SOURCES = {
     "Concat": Path("data/runs/paper_v3/concat_predictions.jsonl"),
-    "CEBT": Path("data/runs/paper_v3/cebt_predictions.jsonl"),
-    "EJSSM-BGE": Path("data/runs/paper_v3_bge_ejssm_balanced/ejssm_predictions.jsonl"),
+    "Event bottleneck": Path("data/runs/paper_v3/cebt_predictions.jsonl"),
+    "Event-jump SSM": Path("data/runs/paper_v3_bge_ejssm_balanced/ejssm_predictions.jsonl"),
     "DJB": Path("data/runs/paper_v3_bge_djb_best/djb_predictions.jsonl"),
     "RC-DJB": Path("data/runs/paper_v3_bge_rc_djb_best/rc_djb_predictions.jsonl"),
 }
@@ -40,9 +40,9 @@ MODEL_ORDER = ["no_event", "concat", "cebt", "dot", "ejssm_bge", "djb", "rc_djb"
 DISPLAY_NAMES = {
     "no_event": "No-event",
     "concat": "Concat fusion",
-    "cebt": "CEBT",
-    "dot": "DOT",
-    "ejssm_bge": "EJSSM-BGE",
+    "cebt": "Event bottleneck",
+    "dot": "Disclosure operator",
+    "ejssm_bge": "Event-jump SSM",
     "djb": "DJB",
     "rc_djb": "RC-DJB",
 }
@@ -720,15 +720,15 @@ def make_bridge_vector_field(path: Path) -> None:
 def make_rank_decile_ribbons(path: Path) -> None:
     sources = {
         "Concat": MONTHLY_PREDICTION_SOURCES["Concat"],
-        "CEBT": MONTHLY_PREDICTION_SOURCES["CEBT"],
-        "EJSSM-BGE": MONTHLY_PREDICTION_SOURCES["EJSSM-BGE"],
+        "Event bottleneck": MONTHLY_PREDICTION_SOURCES["Event bottleneck"],
+        "Event-jump SSM": MONTHLY_PREDICTION_SOURCES["Event-jump SSM"],
         "DJB": MONTHLY_PREDICTION_SOURCES["DJB"],
         "RC-DJB": MONTHLY_PREDICTION_SOURCES["RC-DJB"],
     }
     colors = {
         "Concat": "#5f6f80",
-        "CEBT": "#8a6fd1",
-        "EJSSM-BGE": "#4f82d6",
+        "Event bottleneck": "#8a6fd1",
+        "Event-jump SSM": "#4f82d6",
         "DJB": "#d1b84e",
         "RC-DJB": "#4fbf78",
     }

@@ -1,6 +1,6 @@
 # Paper
 
-This directory contains the current CEBT paper draft.
+This directory contains the current DJB paper draft.
 
 - `main.tex` is the LaTeX source.
 - `main.pdf` is the current compiled paper snapshot.
