@@ -1,0 +1,10 @@
+base_config: configs/paper_v3_bge_ff4.yaml
+feature_dir: data/processed/paper_v3_bge_ff4
+output_root: data/runs/djb_ff4_replication_sweeps
+models: ["djb", "rc_djb"]
+seeds: [29, 42, 7, 88, 13]
+interventions: ["full"]
+
+sweeps:
+  - id: baseline_ff4
+    overrides: {}

@@ -8,6 +8,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from cebt.cli import load_run_config, processed_dir, resolve_path
 from cebt.evaluation.evaluate import evaluate_model
 from cebt.training.train import train_model
@@ -83,9 +85,20 @@ def main() -> None:
                 )
     write_json(output_root / "manifest.json", {"runs": manifest})
     _write_metrics_csv(output_root / "metrics.csv", metric_rows)
+    summary_rows = _summary_rows(metric_rows)
+    _write_metrics_csv(output_root / "summary.csv", summary_rows)
+    paired_rows = _paired_model_rows(metric_rows)
+    _write_metrics_csv(output_root / "paired_model_differences.csv", paired_rows)
     print(f"Wrote {len(manifest)} run manifest rows to {output_root / 'manifest.json'}")
     if metric_rows:
         print(f"Wrote {len(metric_rows)} metric rows to {output_root / 'metrics.csv'}")
+        print(f"Wrote {len(summary_rows)} summary rows to {output_root / 'summary.csv'}")
+    if paired_rows:
+        print(
+            "Wrote "
+            f"{len(paired_rows)} paired model rows to "
+            f"{output_root / 'paired_model_differences.csv'}"
+        )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -144,6 +157,87 @@ def _write_metrics_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=keys)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _summary_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in rows:
+        key = (str(row["sweep_id"]), str(row["model_name"]), str(row["intervention"]))
+        grouped.setdefault(key, []).append(row)
+    summary = []
+    for (sweep_id, model_name, intervention), group_rows in sorted(grouped.items()):
+        base = {
+            "sweep_id": sweep_id,
+            "model_name": model_name,
+            "intervention": intervention,
+            "runs": len(group_rows),
+            "seeds": ",".join(str(row["seed"]) for row in group_rows),
+        }
+        for metric in (
+            "mse",
+            "rank_ic",
+            "balanced_accuracy",
+            "spread",
+            "latent_jump_auc",
+            "response_transport_auc",
+            "volatility_transport_auc",
+            "volume_transport_auc",
+        ):
+            base.update(_metric_distribution(group_rows, metric))
+        summary.append(base)
+    return summary
+
+
+def _paired_model_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_cell: dict[tuple[str, str, int], dict[str, dict[str, Any]]] = {}
+    for row in rows:
+        key = (str(row["sweep_id"]), str(row["intervention"]), int(row["seed"]))
+        by_cell.setdefault(key, {})[str(row["model_name"])] = row
+    pair_rows = []
+    for (sweep_id, intervention, seed), models in sorted(by_cell.items()):
+        if "djb" not in models or "rc_djb" not in models:
+            continue
+        djb = models["djb"]
+        rc_djb = models["rc_djb"]
+        pair_rows.append(
+            {
+                "sweep_id": sweep_id,
+                "intervention": intervention,
+                "seed": seed,
+                "rc_djb_minus_djb_rank_ic": _diff(rc_djb, djb, "rank_ic"),
+                "rc_djb_minus_djb_mse": _diff(rc_djb, djb, "mse"),
+                "rc_djb_minus_djb_response_transport_auc": _diff(
+                    rc_djb,
+                    djb,
+                    "response_transport_auc",
+                ),
+            }
+        )
+    return pair_rows
+
+
+def _metric_distribution(rows: list[dict[str, Any]], metric: str) -> dict[str, Any]:
+    values = np.asarray(
+        [float(row[metric]) for row in rows if row.get(metric) is not None],
+        dtype=float,
+    )
+    if values.size == 0:
+        return {
+            f"{metric}_median": None,
+            f"{metric}_q25": None,
+            f"{metric}_q75": None,
+        }
+    return {
+        f"{metric}_median": float(np.median(values)),
+        f"{metric}_q25": float(np.quantile(values, 0.25)),
+        f"{metric}_q75": float(np.quantile(values, 0.75)),
+    }
+
+
+def _diff(left: dict[str, Any], right: dict[str, Any], metric: str) -> float | None:
+    if left.get(metric) is None or right.get(metric) is None:
+        return None
+    return float(left[metric]) - float(right[metric])
 
 
 if __name__ == "__main__":
