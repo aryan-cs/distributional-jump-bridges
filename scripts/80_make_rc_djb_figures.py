@@ -12,6 +12,7 @@ import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Patch
+from matplotlib.path import Path as MplPath
 from matplotlib.ticker import FuncFormatter
 
 METRICS_PATH = Path("paper/tables/table_eval_metrics.csv")
@@ -174,9 +175,31 @@ def make_architecture_figure(path: Path) -> None:
             mutation_scale=11,
             linewidth=lw,
             color=color,
-            shrinkA=4,
-            shrinkB=4,
+            shrinkA=0,
+            shrinkB=0,
             connectionstyle="arc3,rad=0",
+            joinstyle="miter",
+            capstyle="butt",
+        )
+        ax.add_patch(patch)
+
+    def elbow_arrow(
+        points: list[tuple[float, float]],
+        *,
+        color: str = palette["line"],
+        lw: float = 1.35,
+    ) -> None:
+        path = MplPath(points, [MplPath.MOVETO] + [MplPath.LINETO] * (len(points) - 1))
+        patch = FancyArrowPatch(
+            path=path,
+            arrowstyle="-|>",
+            mutation_scale=11,
+            linewidth=lw,
+            color=color,
+            shrinkA=0,
+            shrinkB=0,
+            joinstyle="miter",
+            capstyle="butt",
         )
         ax.add_patch(patch)
 
@@ -241,25 +264,41 @@ def make_architecture_figure(path: Path) -> None:
         subtitle_size=8.6,
     )
 
-    rail_x = 0.850
-    rail_top = 0.755
-    rail_bottom = 0.360
-    rail_mid = 0.550
-    ax.plot(
-        [rail_x, rail_x],
-        [rail_bottom, rail_top],
-        color=palette["muted"],
-        linewidth=1.25,
-        solid_capstyle="round",
+    edge_gap = 0.010
+    arrow((0.260 + edge_gap, 0.755), (0.340 - edge_gap, 0.755))
+    arrow((0.260 + edge_gap, 0.360), (0.340 - edge_gap, 0.360))
+    arrow(
+        (0.530 + edge_gap, 0.755),
+        (0.625 - edge_gap, 0.755),
+        color=palette["protected"],
+        lw=1.25,
     )
-
-    arrow((0.260, 0.755), (0.340, 0.755))
-    arrow((0.260, 0.360), (0.340, 0.360))
-    arrow((0.530, 0.755), (0.625, 0.755), color=palette["protected"], lw=1.25)
-    arrow((0.530, 0.360), (0.625, 0.360), color=palette["muted"], lw=1.20)
-    arrow((0.825, 0.755), (rail_x, 0.755), color=palette["protected"], lw=1.20)
-    arrow((0.825, 0.360), (rail_x, 0.360), color=palette["line"], lw=1.20)
-    arrow((rail_x, rail_mid), (0.890, rail_mid), color=palette["line"], lw=1.20)
+    arrow(
+        (0.530 + edge_gap, 0.360),
+        (0.625 - edge_gap, 0.360),
+        color=palette["muted"],
+        lw=1.20,
+    )
+    elbow_arrow(
+        [
+            (0.825 + edge_gap, 0.755),
+            (0.858, 0.755),
+            (0.858, 0.620),
+            (0.890 - edge_gap, 0.620),
+        ],
+        color=palette["protected"],
+        lw=1.20,
+    )
+    elbow_arrow(
+        [
+            (0.825 + edge_gap, 0.360),
+            (0.858, 0.360),
+            (0.858, 0.500),
+            (0.890 - edge_gap, 0.500),
+        ],
+        color=palette["line"],
+        lw=1.20,
+    )
 
     _save(fig, path, dpi=240)
 
