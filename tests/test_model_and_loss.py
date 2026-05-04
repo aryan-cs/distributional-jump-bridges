@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 
 from cebt.models.cebt import CEBTConfig, build_model
-from cebt.training.losses import LossWeights, cebt_loss, pairwise_rank_loss
+from cebt.training.losses import LossWeights, cebt_loss, gaussian_nll_loss, pairwise_rank_loss
 
 
 def test_cebt_forward_shapes_and_finite_loss() -> None:
@@ -57,6 +57,36 @@ def test_disclosure_operator_forward_shapes() -> None:
     assert outputs["z_event"].shape == (4, 32)
     assert outputs["operator_norm"].shape == (4,)
     assert torch.all(torch.isfinite(outputs["operator_norm"]))
+
+
+def test_event_jump_state_space_forward_shapes_and_nll() -> None:
+    config = CEBTConfig(
+        price_features=8,
+        metadata_features=6,
+        event_embedding_dim=16,
+        hidden_dim=32,
+        latent_dim=4,
+        jump_scale=0.2,
+    )
+    model = build_model("ejssm", config)
+    outputs = model(
+        torch.randn(4, 5, 8),
+        torch.randn(4, 16),
+        torch.randn(4, 6),
+    )
+    assert outputs["prediction"].shape == (4, 3)
+    assert outputs["event_delta"].shape == (4, 3)
+    assert outputs["z_event"].shape == (4, 32)
+    assert outputs["outcome_logvar"].shape == (4, 3)
+    assert outputs["jump_norm"].shape == (4,)
+    targets = torch.randn(4, 3)
+    nll = gaussian_nll_loss(outputs, targets)
+    loss, metrics = cebt_loss(
+        outputs, targets, torch.tensor([1.0, 1.0, 0.0, 0.0]), LossWeights(nll_weight=0.1)
+    )
+    assert torch.isfinite(nll)
+    assert torch.isfinite(loss)
+    assert metrics["nll"] == float(nll.detach().cpu())
 
 
 def test_pairwise_rank_loss_rewards_correct_ordering_on_events() -> None:

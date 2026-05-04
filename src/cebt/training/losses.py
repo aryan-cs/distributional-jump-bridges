@@ -11,6 +11,7 @@ from torch.nn import functional as F
 @dataclass(frozen=True)
 class LossWeights:
     supervised_weight: float = 1.0
+    nll_weight: float = 0.0
     control_delta_weight: float = 0.25
     kl_weight: float = 0.01
     sparsity_weight: float = 0.001
@@ -30,6 +31,7 @@ def cebt_loss(
     weights: LossWeights,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     supervised = F.mse_loss(outputs["prediction"], targets)
+    nll = gaussian_nll_loss(outputs, targets)
     control_mask = (is_event <= 0.5).float().unsqueeze(-1)
     if torch.sum(control_mask) > 0:
         control_delta = torch.sum((outputs["event_delta"] * control_mask) ** 2) / torch.sum(
@@ -54,6 +56,7 @@ def cebt_loss(
     )
     total = (
         weights.supervised_weight * supervised
+        + weights.nll_weight * nll
         + weights.control_delta_weight * control_delta
         + weights.kl_weight * kl
         + weights.sparsity_weight * sparsity
@@ -63,6 +66,7 @@ def cebt_loss(
     metrics = {
         "loss": float(total.detach().cpu()),
         "supervised": float(supervised.detach().cpu()),
+        "nll": float(nll.detach().cpu()),
         "control_delta": float(control_delta.detach().cpu()),
         "kl": float(kl.detach().cpu()),
         "sparsity": float(sparsity.detach().cpu()),
@@ -70,6 +74,14 @@ def cebt_loss(
         "rank": float(rank.detach().cpu()),
     }
     return total, metrics
+
+
+def gaussian_nll_loss(outputs: dict[str, torch.Tensor], targets: torch.Tensor) -> torch.Tensor:
+    if "outcome_logvar" not in outputs:
+        return targets.new_tensor(0.0)
+    logvar = torch.clamp(outputs["outcome_logvar"], min=-7.0, max=3.0)
+    squared_error = (targets - outputs["prediction"]) ** 2
+    return 0.5 * torch.mean(torch.exp(-logvar) * squared_error + logvar)
 
 
 def pairwise_rank_loss(
