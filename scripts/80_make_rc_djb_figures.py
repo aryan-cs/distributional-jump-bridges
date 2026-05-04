@@ -250,7 +250,7 @@ def make_architecture_figure(path: Path) -> None:
 def make_pareto_frontier(path: Path) -> None:
     metrics = _read_metric_table(METRICS_PATH)
     models = [model for model in MODEL_ORDER if model in metrics]
-    fig, ax = plt.subplots(figsize=(8.2, 5.2))
+    fig, ax = plt.subplots(figsize=(8.2, 4.55))
     ax.set_facecolor("#fbfdff")
     ax.grid(True, color="#e5edf4", linewidth=0.7)
     ax.axhline(0.0, color="#64748b", linewidth=0.9)
@@ -325,12 +325,12 @@ def make_pareto_frontier(path: Path) -> None:
     ax.legend(
         handles=handles,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.22),
+        bbox_to_anchor=(0.5, -0.20),
         ncol=4,
         frameon=False,
         fontsize=8,
     )
-    fig.subplots_adjust(bottom=0.30, top=0.88, left=0.12, right=0.98)
+    fig.subplots_adjust(bottom=0.28, top=0.88, left=0.12, right=0.98)
     _save(fig, path, dpi=260)
 
 

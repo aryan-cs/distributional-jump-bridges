@@ -14,8 +14,19 @@
 \usepackage{amssymb}
 \usepackage{siunitx}
 \usepackage{xcolor}
+\usepackage{needspace}
+\usepackage{placeins}
 
 \emergencystretch=2em
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{2pt}
+\setlength{\abovedisplayskip}{7pt plus 2pt minus 2pt}
+\setlength{\belowdisplayskip}{7pt plus 2pt minus 2pt}
+\setlength{\abovedisplayshortskip}{5pt plus 2pt minus 2pt}
+\setlength{\belowdisplayshortskip}{5pt plus 2pt minus 2pt}
 
 \hypersetup{
     colorlinks=true,
@@ -111,7 +122,7 @@ components, but the abnormal-return mean remains no-event anchored.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/rc_djb_architecture.pdf}
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_architecture.pdf}
 \caption{RC-DJB first estimates a no-event response distribution from market history. Disclosure
 text generates a bounded bridge for risk/liquidity response and predictive uncertainty, but a
 return-mean firewall enforces \(\Delta \mu_r=0\).}
@@ -125,6 +136,7 @@ Each sample \(i\) has label start date \(\tau_i\), a 40-trading-day pre-event te
 five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump. The headline
 variant uses chunk-pooled BGE-small disclosure embeddings \citep{xiao2023cpack}.
 
+\Needspace{13\baselineskip}
 \paragraph{Event-study labels.}
 Let \(P_{i,t}\), \(V_{i,t}\), and \(r_{i,t}\) denote adjusted close, volume, and daily close return
 for firm \(i\), and let \(r^M_t\) denote the SPY return. The label window
@@ -166,19 +178,16 @@ Disclosure text generates a bounded latent state jump and distributional transpo
     j_i &= \alpha \tanh(u_\theta(b_i)) \odot \sigma(v_\theta(b_i)),\\
     [\Delta \mu_i, \Delta \ell_i] &= T_\theta(\mathrm{LN}(\tilde{s}_i+j_i), b_i, m_i).
 \end{align}
-The central architectural constraint is
-\begin{equation}
-    \Delta \mu_{i,return} = 0.
-\end{equation}
-Thus,
-\begin{equation}
+The central architectural constraint is \(\Delta \mu_{i,return}=0\). Thus,
+\begin{align}
     \mu_{1,i} =
     \mu_{0,i} + [0,\Delta\mu_{i,volatility},\Delta\mu_{i,volume}],
     \qquad
     \ell_{1,i} = \mathrm{clip}(\ell_{0,i}+\Delta\ell_i).
-\end{equation}
+\end{align}
 The model predicts \(p_\theta(y_i)=\mathcal{N}(\mu_{1,i},\mathrm{diag}(\exp(\ell_{1,i})))\).
 
+\Needspace{12\baselineskip}
 \paragraph{Objective.}
 For target dimension \(k\), the Gaussian negative log likelihood used for probabilistic training
 and evaluation is
@@ -252,9 +261,9 @@ Daily prices are downloaded from public price endpoints, with SPY used as the ma
 abnormal returns. The trading calendar is inferred from observed price rows. Event label windows
 start on the same observed trading day for filings accepted before 16:00 ET; filings accepted after
 16:00 ET or on non-trading days start on the next observed trading day. Features use only prices
-strictly before the label start date. Labels use future returns only as targets. One deterministic same-ticker
-no-event control is constructed for each filing, excluding dates within a 10-calendar-day blackout
-window around known events.
+strictly before the label start date. Labels use future returns only as targets. One deterministic
+same-ticker no-event control is constructed for each filing, excluding dates within a 10-calendar-day
+blackout window around known events.
 
 \begin{table}[H]
 \centering
@@ -289,6 +298,7 @@ bootstrap resampling; ticker-clustered intervals resample tickers with replaceme
 comparisons use row-paired bootstrap resampling. Rank IC is Spearman correlation between predicted
 and realized abnormal return.
 
+\Needspace{15\baselineskip}
 \paragraph{Evaluation statistics.}
 For model \(m\), the reported multi-target error is
 \begin{equation}
@@ -353,7 +363,7 @@ Mean predictive standard deviation is
 are 95\% ticker-clustered bootstrap intervals.}
 \label{tab:main-results}
 \small
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrlrl}
 \toprule
 Model & MSE & MSE CI & Rank IC & Rank IC CI \\
 \midrule
@@ -374,7 +384,7 @@ RC-DJB & 0.0554 & [0.0400, 0.0776] & \textbf{0.0546} & [0.0104, 0.0948] \\
 rank values mean RC-DJB has higher rank IC.}
 \label{tab:paired}
 \small
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrlrl}
 \toprule
 Baseline & MSE Diff. & 95\% CI & Rank IC Diff. & 95\% CI \\
 \midrule
@@ -387,6 +397,7 @@ EJSSM-BGE & -0.00076 & [-0.00163, 0.00005] & 0.0447 & [-0.0072, 0.0952] \\
 \end{tabular}
 \end{table}
 
+\Needspace{8\baselineskip}
 \paragraph{Bridge diagnostics.}
 The response-transport statistic for group \(c\in\{0,1\}\) is
 \begin{equation}
@@ -417,6 +428,7 @@ Latent bridge AUC, events vs. controls & 0.6038 \\
 \end{tabular}
 \end{table}
 
+\Needspace{8\baselineskip}
 \paragraph{Intervention definitions.}
 The no-bridge intervention is the implementation's no-jump forward pass: it sets the bridge state
 jump, bridge hidden state, mean delta, and log-variance delta to zero, so \(\mu_1=\mu_0\) and
@@ -462,7 +474,7 @@ Shuffled text & 0.0081 & [0.0051, 0.0117] \\
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/rc_djb_pareto_frontier.pdf}
+\includegraphics[width=0.94\linewidth]{figures/rc_djb_pareto_frontier.pdf}
 \caption{RC-DJB occupies a different point on the response/ranking tradeoff: EJSSM and DJB have
 lower point MSE, while RC-DJB is the only tested low-error model with a strictly positive
 ticker-clustered rank-IC interval.}
@@ -471,7 +483,7 @@ ticker-clustered rank-IC interval.}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/rc_djb_intervention_story.pdf}
+\includegraphics[width=0.92\linewidth]{figures/rc_djb_intervention_story.pdf}
 \caption{Interventions show that the disclosure bridge matters for event-response error. Rank IC
 does not move under text interventions because the return-mean firewall prevents direct
 text-to-return overwriting.}
@@ -480,13 +492,14 @@ text-to-return overwriting.}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/rc_djb_monthly_rank_heatmap.pdf}
+\includegraphics[width=0.94\linewidth]{figures/rc_djb_monthly_rank_heatmap.pdf}
 \caption{Monthly event-rank IC over held-out real 8-K rows. The model-level rank result is not
 uniform across months, but RC-DJB has a more positive held-out pattern than fusion and unconstrained
 event-mean transport baselines.}
 \label{fig:rank-heatmap}
 \end{figure}
 
+\FloatBarrier
 \section{Findings}
 
 \paragraph{Return-mean conservation recovers rank signal.}
@@ -548,7 +561,11 @@ The evidence supports a more precise architecture principle for disclosure model
 transport response risk, liquidity, and uncertainty, but keep near-term return ranking anchored to
 the no-event market state unless stronger evidence justifies crossing that boundary.
 
+\begingroup
+\footnotesize
+\setlength{\bibsep}{1pt}
 \bibliographystyle{plainnat}
 \bibliography{references}
+\endgroup
 
 \end{document}
