@@ -87,7 +87,7 @@ def _plot_metric_comparison(metrics: dict[str, dict], figure_dir: Path) -> Path:
     ]
     path = figure_dir / "metric_comparison.png"
     plt.figure(figsize=(8, 4.5))
-    plt.bar(names, values, yerr=yerr, capsize=4, color="#4c78a8")
+    plt.bar(names, values, yerr=yerr, capsize=4, color="#5f5f5f")
     plt.ylabel("MSE, lower is better")
     plt.title("Forecast Error With Bootstrap 95% CI")
     plt.xticks(range(len(names)), [_display_name(name) for name in names], rotation=15, ha="right")
@@ -112,7 +112,7 @@ def _plot_rank_ic(metrics: dict[str, dict], figure_dir: Path) -> Path:
         [max(value - lo, 0.0) for value, lo in zip(values, lows, strict=False)],
         [max(hi - value, 0.0) for value, hi in zip(values, highs, strict=False)],
     ]
-    colors = ["#9ca3af" if name != "cebt" else "#2a9d8f" for name in names]
+    colors = ["#b3b3b3" if name != "cebt" else "#242424" for name in names]
     path = figure_dir / "rank_ic_comparison.png"
     plt.figure(figsize=(8, 4.5))
     plt.bar(names, values, yerr=yerr, capsize=4, color=colors)
@@ -172,8 +172,8 @@ def _plot_architecture(figure_dir: Path) -> Path:
     plt.figure(figsize=(11, 5.2))
     ax = plt.gca()
     ax.set_axis_off()
-    colors = ["#f4f1de", "#f4f1de", "#81b29a", "#e07a5f", "#3d405b", "#3d405b", "#2a9d8f"]
-    text_colors = ["black", "black", "black", "white", "white", "white", "white"]
+    colors = ["#eeeeee", "#eeeeee", "#d0d0d0", "#b8b8b8", "#666666", "#666666", "#242424"]
+    text_colors = ["#242424", "#242424", "#242424", "#242424", "white", "white", "white"]
     for (x, y, text), color, text_color in zip(boxes, colors, text_colors, strict=False):
         ax.add_patch(
             plt.Rectangle((x, y), 0.20, 0.16, facecolor=color, edgecolor="black", linewidth=1.2)
@@ -192,13 +192,13 @@ def _plot_architecture(figure_dir: Path) -> Path:
         "Control loss suppresses event delta on matched no-event dates",
         ha="center",
         fontsize=11,
-        color="#7f1d1d",
+        color="#242424",
     )
     ax.annotate(
         "",
         xy=(0.70, 0.31),
         xytext=(0.44, 0.12),
-        arrowprops={"arrowstyle": "->", "linewidth": 1.4, "color": "#7f1d1d"},
+        arrowprops={"arrowstyle": "->", "linewidth": 1.4, "color": "#242424"},
     )
     plt.xlim(0, 1)
     plt.ylim(0, 1)
@@ -215,7 +215,7 @@ def _plot_prediction_scatter(predictions: list[dict], figure_dir: Path) -> Path:
     y = [row["target_abnormal_return"] for row in rows]
     path = figure_dir / "prediction_scatter.png"
     plt.figure(figsize=(5.5, 5.0))
-    plt.scatter(x, y, s=24, alpha=0.75, color="#2a9d8f")
+    plt.scatter(x, y, s=24, alpha=0.75, color="#4f4f4f")
     plt.axhline(0.0, color="black", linewidth=0.8)
     plt.axvline(0.0, color="black", linewidth=0.8)
     plt.xlabel("Predicted abnormal return")
@@ -234,7 +234,7 @@ def _plot_prediction_phase_portrait(predictions: list[dict], figure_dir: Path) -
     y = np.asarray([row["target_abnormal_return"] for row in rows], dtype=float)
     path = figure_dir / "prediction_phase_portrait.png"
     plt.figure(figsize=(6.0, 5.2))
-    plt.hexbin(x, y, gridsize=30, mincnt=1, cmap="viridis")
+    plt.hexbin(x, y, gridsize=30, mincnt=1, cmap="Greys")
     plt.colorbar(label="Held-out events per cell")
     plt.axhline(0.0, color="white", linewidth=1.0, alpha=0.9)
     plt.axvline(0.0, color="white", linewidth=1.0, alpha=0.9)
@@ -269,7 +269,7 @@ def _plot_temporal_rank_ic_heatmap(predictions: list[dict], figure_dir: Path) ->
     path = figure_dir / "temporal_rank_ic_heatmap.png"
     width = max(8.0, 0.42 * len(months))
     plt.figure(figsize=(width, 3.8))
-    im = plt.imshow(matrix, aspect="auto", cmap="RdBu", vmin=-0.35, vmax=0.35)
+    im = plt.imshow(matrix, aspect="auto", cmap="Greys", vmin=-0.35, vmax=0.35)
     plt.colorbar(im, label="Monthly event rank IC")
     plt.yticks(range(len(models)), [_display_name(model).replace("\n", " ") for model in models])
     plt.xticks(range(len(months)), months, rotation=45, ha="right")
@@ -301,7 +301,7 @@ def _plot_event_residual_mosaic(predictions: list[dict], figure_dir: Path) -> Pa
     height = max(5.0, 0.18 * len(tickers))
     plt.figure(figsize=(width, height))
     masked = np.ma.masked_invalid(matrix)
-    im = plt.imshow(masked, aspect="auto", cmap="magma")
+    im = plt.imshow(masked, aspect="auto", cmap="Greys")
     plt.colorbar(im, label="Mean absolute CEBT event residual")
     plt.yticks(range(len(tickers)), tickers)
     plt.xticks(range(len(months)), months, rotation=45, ha="right")
@@ -339,7 +339,7 @@ def _plot_residual_distribution(predictions: list[dict], figure_dir: Path) -> Pa
         density=True,
         alpha=0.65,
         label="True 8-K events",
-        color="#2a9d8f",
+        color="#4f4f4f",
     )
     plt.hist(
         control_values,
@@ -347,7 +347,7 @@ def _plot_residual_distribution(predictions: list[dict], figure_dir: Path) -> Pa
         density=True,
         alpha=0.55,
         label="Matched no-event controls",
-        color="#e76f51",
+        color="#9d9d9d",
     )
     plt.xlabel("Absolute event residual")
     plt.ylabel("Density")

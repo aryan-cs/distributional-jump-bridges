@@ -46,14 +46,14 @@ DISPLAY_NAMES = {
     "djb": "DJB",
     "rc_djb": "RC-DJB",
 }
-PASTEL_MODELS = {
-    "no_event": "#a9b4c2",
-    "concat": "#9fb3bc",
-    "cebt": "#b998dd",
-    "dot": "#91b7e7",
-    "ejssm_bge": "#7bbce9",
-    "djb": "#f0a46f",
-    "rc_djb": "#5fc4b0",
+GRAY_MODELS = {
+    "no_event": "#c4c4c4",
+    "concat": "#b3b3b3",
+    "cebt": "#9d9d9d",
+    "dot": "#8a8a8a",
+    "ejssm_bge": "#737373",
+    "djb": "#666666",
+    "rc_djb": "#4f4f4f",
 }
 
 
@@ -81,10 +81,10 @@ def _set_style() -> None:
             "mathtext.fontset": "cm",
             "axes.formatter.use_mathtext": True,
             "axes.linewidth": 0.8,
-            "axes.edgecolor": "#334155",
-            "axes.labelcolor": "#1f2937",
-            "xtick.color": "#374151",
-            "ytick.color": "#374151",
+            "axes.edgecolor": "#3a3a3a",
+            "axes.labelcolor": "#242424",
+            "xtick.color": "#454545",
+            "ytick.color": "#454545",
             "figure.facecolor": "white",
             "savefig.facecolor": "white",
             "pdf.fonttype": 42,
@@ -107,16 +107,16 @@ def make_architecture_figure(path: Path) -> None:
     ax.set_ylim(0.0, 1.0)
 
     palette = {
-        "ink": "#1f2937",
-        "muted": "#6b7280",
-        "input": "#dbe4ee",
-        "state": "#b9d3f5",
-        "bridge": "#ffe1b8",
-        "constraint": "#b4efc8",
-        "transport": "#ddd5fb",
-        "output": "#9ee8c7",
-        "line": "#374151",
-        "protected": "#2f8a63",
+        "ink": "#242424",
+        "muted": "#707070",
+        "input": "#eeeeee",
+        "state": "#d0d0d0",
+        "bridge": "#c6c6c6",
+        "constraint": "#b9b9b9",
+        "transport": "#ababab",
+        "output": "#9b9b9b",
+        "line": "#454545",
+        "protected": "#242424",
     }
 
     def box(
@@ -248,7 +248,7 @@ def make_architecture_figure(path: Path) -> None:
         r"$X_{<t}$",
         palette["input"],
     )
-    box((right_x, y_input), (box_w, box_h), "SEC 8-K disclosure", r"$e_t$", "#fff0ad")
+    box((right_x, y_input), (box_w, box_h), "SEC 8-K disclosure", r"$e_t$", "#e0e0e0")
     box(
         (left_x, y_encoder),
         (box_w, box_h),
@@ -343,9 +343,9 @@ def make_pareto_frontier(path: Path) -> None:
     metrics = _read_metric_table(METRICS_PATH)
     models = [model for model in MODEL_ORDER if model in metrics]
     fig, ax = plt.subplots(figsize=(8.2, 4.55))
-    ax.set_facecolor("#fbfdff")
-    ax.grid(True, color="#e5edf4", linewidth=0.7)
-    ax.axhline(0.0, color="#64748b", linewidth=0.9)
+    ax.set_facecolor("#f7f7f7")
+    ax.grid(True, color="#dddddd", linewidth=0.7)
+    ax.axhline(0.0, color="#6a6a6a", linewidth=0.9)
 
     xs, ys, xlos, xhis, ylos, yhis = [], [], [], [], [], []
     for model in models:
@@ -366,14 +366,14 @@ def make_pareto_frontier(path: Path) -> None:
         metrics["concat"]["mse"],
         ymin=0.50,
         ymax=1.00,
-        facecolor="#caefe1",
+        facecolor="#c9c9c9",
         alpha=0.72,
         label="Lower error than concat, positive rank IC",
     )
     for model, x, y, lo_x, hi_x, lo_y, hi_y in zip(
         models, xs, ys, xlos, xhis, ylos, yhis, strict=True
     ):
-        color = PASTEL_MODELS[model]
+        color = GRAY_MODELS[model]
         ax.errorbar(
             x,
             y,
@@ -381,7 +381,7 @@ def make_pareto_frontier(path: Path) -> None:
             yerr=[[max(y - lo_y, 0.0)], [max(hi_y - y, 0.0)]],
             fmt="o",
             markersize=7,
-            markeredgecolor="#1f2937",
+            markeredgecolor="#242424",
             markeredgewidth=0.8,
             color=color,
             ecolor=color,
@@ -404,15 +404,15 @@ def make_pareto_frontier(path: Path) -> None:
             [0],
             marker="o",
             color="none",
-            markerfacecolor=PASTEL_MODELS[model],
-            markeredgecolor="#1f2937",
+            markerfacecolor=GRAY_MODELS[model],
+            markeredgecolor="#242424",
             markersize=7,
             label=DISPLAY_NAMES[model],
         )
         for model in models
     ]
     handles.append(
-        Line2D([0], [0], color="#6f9fd1", linewidth=1.6, label="95% ticker-clustered CI")
+        Line2D([0], [0], color="#777777", linewidth=1.6, label="95% ticker-clustered CI")
     )
     ax.legend(
         handles=handles,
@@ -459,26 +459,26 @@ def make_data_temporal_audit(path: Path) -> None:
 
     ax = axes[0]
     x = np.arange(len(months))
-    ax.set_facecolor("#fbfdff")
-    ax.grid(True, axis="y", color="#e5edf4", linewidth=0.7)
+    ax.set_facecolor("#f7f7f7")
+    ax.grid(True, axis="y", color="#dddddd", linewidth=0.7)
     ax.stackplot(
         x,
         events,
         controls,
-        colors=["#5fc4b0", "#7bbce9"],
+        colors=["#4f4f4f", "#737373"],
         alpha=0.92,
         labels=["Real 8-K rows", "Matched controls"],
     )
     for boundary, label in [("2023-12", "Train cutoff"), ("2024-12", "Validation cutoff")]:
         if boundary in month_to_x:
             bx = month_to_x[boundary] + 0.5
-            ax.axvline(bx, color="#64748b", linewidth=0.9, linestyle="--")
+            ax.axvline(bx, color="#6a6a6a", linewidth=0.9, linestyle="--")
             ax.text(
                 bx + 0.25,
                 ax.get_ylim()[1] * 0.92,
                 label,
                 fontsize=8,
-                color="#334155",
+                color="#3a3a3a",
                 ha="left",
                 va="top",
             )
@@ -503,13 +503,13 @@ def make_data_temporal_audit(path: Path) -> None:
     )
 
     ax = axes[1]
-    ax.set_facecolor("#fbfdff")
-    ax.grid(True, axis="x", color="#e5edf4", linewidth=0.7, zorder=1)
+    ax.set_facecolor("#f7f7f7")
+    ax.grid(True, axis="x", color="#dddddd", linewidth=0.7, zorder=1)
     gap_palette = {
-        1: "#5fc4b0",
-        2: "#b998dd",
-        3: "#7bbce9",
-        4: "#f0a46f",
+        1: "#4f4f4f",
+        2: "#9d9d9d",
+        3: "#737373",
+        4: "#666666",
     }
     y_lookup = {"Real 8-K rows": "real_event", "Matched controls": "same_ticker_no_event"}
     gap_values = sorted({gap for bucket in gap_counts.values() for gap in bucket})
@@ -526,8 +526,8 @@ def make_data_temporal_audit(path: Path) -> None:
                 percent,
                 left=left,
                 height=0.42,
-                color=gap_palette.get(gap, "#e5e7eb"),
-                edgecolor="#334155",
+                color=gap_palette.get(gap, "#e5e5e5"),
+                edgecolor="#3a3a3a",
                 linewidth=0.55,
                 zorder=3,
             )
@@ -539,7 +539,7 @@ def make_data_temporal_audit(path: Path) -> None:
                     ha="center",
                     va="center",
                     fontsize=7.2,
-                    color="#1f2937",
+                    color="#242424",
                     linespacing=0.95,
                 )
             left += percent
@@ -550,7 +550,7 @@ def make_data_temporal_audit(path: Path) -> None:
             ha="left",
             va="center",
             fontsize=8,
-            color="#334155",
+            color="#3a3a3a",
         )
     ax.set_yticks([0, 1], list(y_lookup))
     ax.set_xlim(0.0, 109.0)
@@ -566,8 +566,8 @@ def make_data_temporal_audit(path: Path) -> None:
     ax.legend(
         handles=[
             Patch(
-                facecolor=gap_palette.get(gap, "#e5e7eb"),
-                edgecolor="#334155",
+                facecolor=gap_palette.get(gap, "#e5e5e5"),
+                edgecolor="#3a3a3a",
                 linewidth=0.55,
                 label=f"{gap} calendar day{'s' if gap != 1 else ''}",
             )
@@ -610,11 +610,11 @@ def make_bridge_vector_field(path: Path) -> None:
     ylim = _robust_limits(np.concatenate([y_real, y_ctl]), padding=0.08)
 
     fig, ax = plt.subplots(figsize=(8.8, 5.6))
-    ax.set_facecolor("#fbfdff")
+    ax.set_facecolor("#f7f7f7")
     hist, x_edges, y_edges = np.histogram2d(x_real, y_real, bins=42, range=[xlim, ylim])
     cmap = LinearSegmentedColormap.from_list(
         "transport_density",
-        ["#fbfdff", "#d5f0e7", "#a9e0cf", "#5fc4b0"],
+        ["#f7f7f7", "#b8b8b8", "#8f8f8f", "#4f4f4f"],
     )
     ax.imshow(
         hist.T,
@@ -629,7 +629,7 @@ def make_bridge_vector_field(path: Path) -> None:
         x_ctl,
         y_ctl,
         s=8,
-        color="#7bbce9",
+        color="#737373",
         alpha=0.42,
         linewidths=0,
         label="Matched controls",
@@ -669,7 +669,7 @@ def make_bridge_vector_field(path: Path) -> None:
                 "arrowstyle": "-|>",
                 "mutation_scale": 12,
                 "linewidth": 1.55,
-                "color": "#2f8a63",
+                "color": "#242424",
                 "alpha": 0.92,
                 "shrinkA": 0,
                 "shrinkB": 0,
@@ -680,15 +680,15 @@ def make_bridge_vector_field(path: Path) -> None:
             [x0],
             [y0],
             s=12,
-            color="#2f8a63",
+            color="#242424",
             edgecolor="white",
             linewidth=0.35,
             zorder=5,
         )
 
-    ax.axhline(0.0, color="#94a3b8", linewidth=0.8)
-    ax.axvline(0.0, color="#94a3b8", linewidth=0.8)
-    ax.grid(True, color="#e5edf4", linewidth=0.65)
+    ax.axhline(0.0, color="#9a9a9a", linewidth=0.8)
+    ax.axvline(0.0, color="#9a9a9a", linewidth=0.8)
+    ax.grid(True, color="#dddddd", linewidth=0.65)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     ax.set_xlabel("No-bridge volatility-jump prediction")
@@ -696,17 +696,17 @@ def make_bridge_vector_field(path: Path) -> None:
     ax.set_title("Disclosure bridge transport field", pad=12, fontweight="semibold")
     ax.legend(
         handles=[
-            Patch(facecolor="#a9e0cf", edgecolor="none", label="Real 8-K density"),
+            Patch(facecolor="#8f8f8f", edgecolor="none", label="Real 8-K density"),
             Line2D(
                 [0],
                 [0],
                 marker="o",
                 color="none",
-                markerfacecolor="#7bbce9",
+                markerfacecolor="#737373",
                 markersize=6,
                 label="Matched controls",
             ),
-            Line2D([0], [0], color="#2f8a63", linewidth=2.0, label="Mean bridge vector"),
+            Line2D([0], [0], color="#242424", linewidth=2.0, label="Mean bridge vector"),
         ],
         loc="upper center",
         bbox_to_anchor=(0.5, -0.15),
@@ -727,15 +727,15 @@ def make_rank_decile_ribbons(path: Path) -> None:
         "RC-DJB": MONTHLY_PREDICTION_SOURCES["RC-DJB"],
     }
     colors = {
-        "Concat": "#9fb3bc",
-        "CEBT": "#b998dd",
-        "EJSSM-BGE": "#7bbce9",
-        "DJB": "#f0a46f",
-        "RC-DJB": "#5fc4b0",
+        "Concat": "#b3b3b3",
+        "CEBT": "#9d9d9d",
+        "EJSSM-BGE": "#737373",
+        "DJB": "#666666",
+        "RC-DJB": "#4f4f4f",
     }
     fig, ax = plt.subplots(figsize=(8.8, 5.0))
-    ax.set_facecolor("#fbfdff")
-    ax.grid(True, color="#e5edf4", linewidth=0.7)
+    ax.set_facecolor("#f7f7f7")
+    ax.grid(True, color="#dddddd", linewidth=0.7)
     x = np.arange(1, 11)
     for name, source in sources.items():
         rows = [
@@ -767,7 +767,7 @@ def make_rank_decile_ribbons(path: Path) -> None:
             linewidth=0,
             zorder=2 if is_main else 1,
         )
-    ax.axhline(0.0, color="#64748b", linewidth=0.9)
+    ax.axhline(0.0, color="#6a6a6a", linewidth=0.9)
     ax.set_xlim(0.6, 10.4)
     ax.set_xticks(x)
     ax.set_xlabel("Predicted abnormal-return decile")
@@ -782,8 +782,8 @@ def make_rank_decile_ribbons(path: Path) -> None:
         ha="left",
         va="top",
         fontsize=8,
-        color="#334155",
-        bbox={"boxstyle": "round,pad=0.35", "facecolor": "white", "edgecolor": "#d8e2ea"},
+        color="#3a3a3a",
+        bbox={"boxstyle": "round,pad=0.35", "facecolor": "white", "edgecolor": "#d8d8d8"},
     )
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.16), ncol=5, frameon=False, fontsize=8)
     fig.subplots_adjust(bottom=0.23, top=0.88, left=0.12, right=0.98)
@@ -827,15 +827,15 @@ def make_bridge_delta_ridges(path: Path) -> None:
     centers = 0.5 * (bins[:-1] + bins[1:])
 
     fig, ax = plt.subplots(figsize=(8.8, 5.0))
-    ax.set_facecolor("#fbfdff")
-    ax.grid(True, axis="x", color="#e5edf4", linewidth=0.7)
+    ax.set_facecolor("#f7f7f7")
+    ax.grid(True, axis="x", color="#dddddd", linewidth=0.7)
     labels = list(sources)
     offsets = np.arange(len(labels))[::-1].astype(float)
     for offset, label in zip(offsets, labels, strict=True):
         real, controls = values_by_variant[label]
         for values, color, alpha, line_color in [
-            (controls, "#7bbce9", 0.66, "#3f80b5"),
-            (real, "#5fc4b0", 0.72, "#2f8a63"),
+            (controls, "#737373", 0.66, "#5f5f5f"),
+            (real, "#4f4f4f", 0.72, "#242424"),
         ]:
             hist, _ = np.histogram(values, bins=bins)
             if hist.max() > 0:
@@ -857,10 +857,10 @@ def make_bridge_delta_ridges(path: Path) -> None:
         ax.plot(
             [median_real, median_real],
             [offset, offset + 0.44],
-            color="#236b4e",
+            color="#242424",
             linewidth=1.05,
         )
-        ax.plot([median_ctl, median_ctl], [offset, offset + 0.36], color="#3477ae", linewidth=1.05)
+        ax.plot([median_ctl, median_ctl], [offset, offset + 0.36], color="#5a5a5a", linewidth=1.05)
     ax.set_yticks(offsets + 0.20, labels)
     ax.set_xlabel(r"Mean absolute bridge transport $|\Delta\mu|$")
     ax.set_ylabel("Intervention")
@@ -873,9 +873,9 @@ def make_bridge_delta_ridges(path: Path) -> None:
     )
     ax.legend(
         handles=[
-            Patch(facecolor="#5fc4b0", edgecolor="none", alpha=0.78, label="Real 8-K rows"),
-            Patch(facecolor="#7bbce9", edgecolor="none", alpha=0.78, label="Matched controls"),
-            Line2D([0], [0], color="#334155", linewidth=1.0, label="Within-row median"),
+            Patch(facecolor="#4f4f4f", edgecolor="none", alpha=0.78, label="Real 8-K rows"),
+            Patch(facecolor="#737373", edgecolor="none", alpha=0.78, label="Matched controls"),
+            Line2D([0], [0], color="#3a3a3a", linewidth=1.0, label="Within-row median"),
         ],
         loc="upper center",
         bbox_to_anchor=(0.5, -0.16),
@@ -900,9 +900,9 @@ def make_firewall_audit(path: Path) -> None:
         ("prediction_volume_jump", "Volume jump"),
     ]
     colors = {
-        "No bridge": "#9fb3bc",
-        "Zero text": "#f0a46f",
-        "Shuffled text": "#b998dd",
+        "No bridge": "#b3b3b3",
+        "Zero text": "#666666",
+        "Shuffled text": "#9d9d9d",
     }
     offsets = {"No bridge": -0.18, "Zero text": 0.0, "Shuffled text": 0.18}
 
@@ -922,9 +922,9 @@ def make_firewall_audit(path: Path) -> None:
             stats.append((variant, label, mean, lo, hi))
 
     fig, ax = plt.subplots(figsize=(8.8, 4.6))
-    ax.set_facecolor("#fbfdff")
-    ax.grid(True, axis="x", color="#e5edf4", linewidth=0.7)
-    ax.axvline(0.0, color="#64748b", linewidth=0.9)
+    ax.set_facecolor("#f7f7f7")
+    ax.grid(True, axis="x", color="#dddddd", linewidth=0.7)
+    ax.axvline(0.0, color="#6a6a6a", linewidth=0.9)
     y_base = {label: idx for idx, (_, label) in enumerate(targets)}
     for variant, label, mean, lo, hi in stats:
         y = y_base[label] + offsets[variant]
@@ -936,7 +936,7 @@ def make_firewall_audit(path: Path) -> None:
             markersize=7,
             color=colors[variant],
             ecolor=colors[variant],
-            markeredgecolor="#1f2937",
+            markeredgecolor="#242424",
             markeredgewidth=0.8,
             elinewidth=2.0,
             capsize=3,
@@ -955,13 +955,13 @@ def make_firewall_audit(path: Path) -> None:
                 marker="o",
                 color="none",
                 markerfacecolor=colors[variant],
-                markeredgecolor="#1f2937",
+                markeredgecolor="#242424",
                 markersize=7,
                 label=variant,
             )
             for variant in variants
         ]
-        + [Line2D([0], [0], color="#9fb9d5", linewidth=2.0, label="95% row-bootstrap CI")],
+        + [Line2D([0], [0], color="#9a9a9a", linewidth=2.0, label="95% row-bootstrap CI")],
         loc="upper center",
         bbox_to_anchor=(0.5, -0.22),
         ncol=4,
@@ -981,10 +981,10 @@ def make_intervention_story(path: Path) -> None:
         "shuffled_text": "Shuffled text",
     }
     pastel = {
-        "full": "#5fc4b0",
-        "no_bridge": "#9fb3bc",
-        "zero_text": "#f0a46f",
-        "shuffled_text": "#b998dd",
+        "full": "#4f4f4f",
+        "no_bridge": "#b3b3b3",
+        "zero_text": "#666666",
+        "shuffled_text": "#9d9d9d",
     }
     fig, axes = plt.subplots(
         2,
@@ -994,15 +994,15 @@ def make_intervention_story(path: Path) -> None:
     )
 
     ax = axes[0]
-    ax.set_facecolor("#fbfdff")
-    ax.grid(True, axis="x", color="#e5edf4", linewidth=0.7)
+    ax.set_facecolor("#f7f7f7")
+    ax.grid(True, axis="x", color="#dddddd", linewidth=0.7)
     y_positions = np.arange(len(paired))
     values = np.asarray([float(row["intervention_minus_full_mse"]) for row in paired])
     lows = np.asarray([float(row["ci_lo"]) for row in paired])
     highs = np.asarray([float(row["ci_hi"]) for row in paired])
     labels = [intervention_names[row["intervention"]] for row in paired]
     colors = [pastel[row["intervention"]] for row in paired]
-    ax.axvline(0.0, color="#64748b", linewidth=0.9)
+    ax.axvline(0.0, color="#6a6a6a", linewidth=0.9)
     for y, value, lo, hi, color in zip(y_positions, values, lows, highs, colors, strict=True):
         ax.errorbar(
             value,
@@ -1010,7 +1010,7 @@ def make_intervention_story(path: Path) -> None:
             xerr=[[max(value - lo, 0.0)], [max(hi - value, 0.0)]],
             fmt="o",
             markersize=7,
-            markeredgecolor="#1f2937",
+            markeredgecolor="#242424",
             markeredgewidth=0.8,
             color=color,
             ecolor=color,
@@ -1028,7 +1028,7 @@ def make_intervention_story(path: Path) -> None:
     )
     ax.set_xlim(0.0, max(highs) * 1.18)
     ax.legend(
-        handles=[Line2D([0], [0], color="#9fb9d5", linewidth=2.0, label="95% paired bootstrap CI")],
+        handles=[Line2D([0], [0], color="#9a9a9a", linewidth=2.0, label="95% paired bootstrap CI")],
         loc="upper center",
         bbox_to_anchor=(0.5, -0.30),
         frameon=False,
@@ -1036,8 +1036,8 @@ def make_intervention_story(path: Path) -> None:
     )
 
     ax = axes[1]
-    ax.set_facecolor("#fbfdff")
-    ax.grid(True, axis="y", color="#e5edf4", linewidth=0.7)
+    ax.set_facecolor("#f7f7f7")
+    ax.grid(True, axis="y", color="#dddddd", linewidth=0.7)
     order = ["full", "no_bridge", "zero_text", "shuffled_text"]
     rows_by_name = {row["intervention"]: row for row in interventions}
     x = np.arange(len(order))
@@ -1048,8 +1048,8 @@ def make_intervention_story(path: Path) -> None:
         x - width / 2,
         real,
         width,
-        color="#5fc4b0",
-        edgecolor="#1f2937",
+        color="#4f4f4f",
+        edgecolor="#242424",
         linewidth=0.6,
         label="Real 8-K rows",
     )
@@ -1057,8 +1057,8 @@ def make_intervention_story(path: Path) -> None:
         x + width / 2,
         controls,
         width,
-        color="#7bbce9",
-        edgecolor="#1f2937",
+        color="#737373",
+        edgecolor="#242424",
         linewidth=0.6,
         label="Matched controls",
     )
@@ -1124,13 +1124,13 @@ def make_event_calendar_atlas(path: Path) -> None:
         colors.append(float(np.mean([row["event_delta_abs_mean"] for row in bucket])))
 
     fig, ax = plt.subplots(figsize=(9.2, 7.0))
-    ax.set_facecolor("#fbfdff")
+    ax.set_facecolor("#f7f7f7")
     for col in range(len(months)):
         if col % 2:
-            ax.axvspan(col - 0.5, col + 0.5, color="#f8fafc", zorder=0)
+            ax.axvspan(col - 0.5, col + 0.5, color="#f8f8f8", zorder=0)
     cmap = LinearSegmentedColormap.from_list(
         "calendar_transport",
-        ["#d5dde8", "#bfe3ee", "#a9e0cf", "#5fc4b0", "#2f8a63"],
+        ["#d5d5d5", "#b0b0b0", "#8f8f8f", "#4f4f4f", "#242424"],
     )
     scatter = ax.scatter(
         xs,
@@ -1138,7 +1138,7 @@ def make_event_calendar_atlas(path: Path) -> None:
         s=sizes,
         c=colors,
         cmap=cmap,
-        edgecolors="#334155",
+        edgecolors="#3a3a3a",
         linewidths=0.45,
         alpha=0.90,
         zorder=3,
@@ -1147,7 +1147,7 @@ def make_event_calendar_atlas(path: Path) -> None:
     ax.set_yticks(np.arange(len(top_tickers)), list(reversed(top_tickers)), fontsize=7)
     ax.set_xlim(-0.65, len(months) - 0.35)
     ax.set_ylim(-0.7, len(top_tickers) - 0.25)
-    ax.grid(True, color="#e5edf4", linewidth=0.55, zorder=1)
+    ax.grid(True, color="#dddddd", linewidth=0.55, zorder=1)
     ax.set_xlabel("Held-out label-start month")
     ax.set_ylabel("Ticker")
     ax.set_title("Held-out disclosure-response atlas", pad=10, fontweight="semibold")
@@ -1155,7 +1155,7 @@ def make_event_calendar_atlas(path: Path) -> None:
     colorbar.set_label(r"Mean bridge transport $|\Delta\mu|$", fontsize=8)
     colorbar.ax.tick_params(labelsize=7)
     size_handles = [
-        ax.scatter([], [], s=18 + 34 * count, facecolor="white", edgecolor="#334155", linewidth=0.6)
+        ax.scatter([], [], s=18 + 34 * count, facecolor="white", edgecolor="#3a3a3a", linewidth=0.6)
         for count in [1, 2, 4]
     ]
     ax.legend(
@@ -1208,18 +1208,18 @@ def make_monthly_rank_heatmap(path: Path) -> None:
 
     cmap = LinearSegmentedColormap.from_list(
         "pastel_rank_ic",
-        ["#e58f8f", "#ffe1b8", "#d5dde8", "#bfe8d8", "#5fc4b0"],
+        ["#f1f1f1", "#c6c6c6", "#d5d5d5", "#a2a2a2", "#4f4f4f"],
     )
     fig, ax = plt.subplots(figsize=(8.8, 3.8))
     masked = np.ma.masked_invalid(matrix)
     im = ax.imshow(masked, aspect="auto", cmap=cmap, vmin=-0.35, vmax=0.35)
-    ax.set_facecolor("#f8fafc")
+    ax.set_facecolor("#f8f8f8")
     ax.set_title("Monthly event-rank IC pattern", pad=10, fontweight="semibold")
     ax.set_yticks(np.arange(len(models)), models)
     ax.set_xticks(np.arange(len(months)), months, rotation=35, ha="right", fontsize=7)
     ax.tick_params(axis="y", labelsize=8)
     for spine in ax.spines.values():
-        spine.set_color("#64748b")
+        spine.set_color("#6a6a6a")
         spine.set_linewidth(0.8)
 
     for row_idx in range(counts.shape[0]):
@@ -1231,7 +1231,7 @@ def make_monthly_rank_heatmap(path: Path) -> None:
                     ".",
                     ha="center",
                     va="center",
-                    color="#64748b",
+                    color="#6a6a6a",
                     fontsize=8,
                 )
 
