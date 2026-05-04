@@ -558,20 +558,9 @@ def make_data_temporal_audit(path: Path) -> None:
         for gap, count in bucket.items()
         if gap <= 0
     )
-    ax.text(
-        0.0,
-        1.48,
-        f"Leakage violations: {leakage_violations}",
-        ha="left",
-        va="center",
-        fontsize=8.4,
-        fontweight="semibold",
-        color="#166534",
-        bbox={"boxstyle": "round,pad=0.32", "facecolor": "#e5f6ef", "edgecolor": "#9fd8cb"},
-    )
     ax.set_yticks([0, 1], list(y_lookup))
     ax.set_xlim(0.0, 109.0)
-    ax.set_ylim(-0.55, 1.70)
+    ax.set_ylim(-0.55, 1.45)
     ax.set_xlabel("Share of rows by guard margin")
     ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:.0f}%"))
     ax.set_title(
@@ -579,6 +568,12 @@ def make_data_temporal_audit(path: Path) -> None:
         loc="left",
         fontsize=10,
         fontweight="semibold",
+    )
+    ax.set_title(
+        f"Leakage violations: {leakage_violations}",
+        loc="right",
+        fontsize=8.6,
+        color="#166534",
     )
     ax.legend(
         handles=[
