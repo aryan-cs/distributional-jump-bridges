@@ -117,8 +117,9 @@ The architecture is related to recurrent, state-space, and dynamical-system meth
 LSTMs and gated recurrent units \citep{hochreiter1997long,cho2014learning}, Koopman operators
 \citep{koopman1931hamiltonian}, neural differential equations \citep{chen2018neuralode},
 structured state-space sequence models \citep{gu2022s4}, and selective state-space models
-\citep{gu2023mamba}. It also draws on probabilistic forecasting and time-series foundation model
-work \citep{dawid1984prequential,gneiting2007strictly,salinas2020deepar,lim2021temporal,
+\citep{gu2023mamba,wang2025ssmbottleneck}. It also draws on probabilistic forecasting and
+time-series foundation model work \citep{dawid1984prequential,gneiting2007strictly,
+salinas2020deepar,lim2021temporal,
 nie2023patchtst,wu2023timesnet,ansari2024chronos,wu2024moment,jin2023timellm}. Marked point
 processes model event arrivals
 \citep{hawkes1971spectra,mei2017neuralhawkes}; here the disclosure time is observed and the task is
@@ -128,9 +129,9 @@ Financial text contains information relevant to prices and fundamentals
 \citep{tetlock2007giving,tetlock2008more,kogan2009predicting,loughran2011liability,cohen2020lazy}.
 Recent financial NLP systems and benchmarks study domain language models, multimodal financial
 forecasting, SEC filing reasoning, and leakage in financial agents
-\citep{jegadeesh2013word,araci2019finbert,wu2023bloomberggpt,yang2023fingpt,chen2025camef,
-islam2023financebench,finrate2026,li2025profitmirage}. RC-DJB is also adjacent to causal
-representation and
+\citep{jegadeesh2013word,araci2019finbert,wu2023bloomberggpt,yang2023fingpt,kong2025timemqa,
+chen2025camef,islam2023financebench,finrate2026,li2025profitmirage}. RC-DJB is also adjacent to
+causal representation and
 counterfactual outcome models \citep{rubin1974estimating,rosenbaum1983central,
 melnychuk2022causaltransformer,feng2024gtransformer}. It differs by imposing a target-specific
 architectural restriction: disclosure text may transport response distribution components, but the
