@@ -391,7 +391,7 @@ def make_pareto_frontier(path: Path) -> None:
 
     ax.set_xlabel("Held-out multi-target MSE (lower is better)")
     ax.set_ylabel("Abnormal-return rank IC (higher is better)")
-    ax.set_title("Response error vs. return-ranking signal", pad=10, fontweight="semibold")
+    ax.set_title("DJB lowers MSE; rank IC is uncertain", pad=10, fontweight="semibold")
     x_margin = (max(xhis) - min(xlos)) * 0.08
     y_margin = (max(yhis) - min(ylos)) * 0.10
     ax.set_xlim(min(xlos) - x_margin, max(xhis) + x_margin)
@@ -492,7 +492,7 @@ def make_data_temporal_audit(path: Path) -> None:
         fontsize=8,
     )
     ax.set_ylabel("Rows per month")
-    ax.set_title("Chronological sample and leakage gate audit", pad=10, fontweight="semibold")
+    ax.set_title("Features precede labels in every row", pad=10, fontweight="semibold")
     ax.legend(
         loc="upper center",
         bbox_to_anchor=(0.5, -0.23),
@@ -557,7 +557,7 @@ def make_data_temporal_audit(path: Path) -> None:
     ax.set_xlabel("Share of rows by guard margin")
     ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:.0f}%"))
     ax.set_title(
-        "Feature-label guard margin distribution",
+        "All rows keep positive guard gaps",
         loc="left",
         fontsize=10,
         fontweight="semibold",
@@ -692,7 +692,7 @@ def make_bridge_vector_field(path: Path) -> None:
     ax.set_ylim(ylim)
     ax.set_xlabel("No-bridge volatility-jump prediction")
     ax.set_ylabel("No-bridge volume-jump prediction")
-    ax.set_title("Disclosure bridge transport field", pad=12, fontweight="semibold")
+    ax.set_title("Bridge shifts volatility and volume", pad=12, fontweight="semibold")
     ax.legend(
         handles=[
             Patch(facecolor="#4fbf78", edgecolor="none", label="Real 8-K density"),
@@ -772,7 +772,7 @@ def make_rank_decile_ribbons(path: Path) -> None:
     ax.set_xlabel("Predicted abnormal-return decile")
     ax.set_ylabel("Realized five-day abnormal return")
     ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{100 * value:.1f}%"))
-    ax.set_title("Rank profiles reveal where signal concentrates", pad=10, fontweight="semibold")
+    ax.set_title("Rank profiles are weak and non-monotone", pad=10, fontweight="semibold")
     ax.text(
         0.015,
         0.955,
@@ -866,7 +866,7 @@ def make_bridge_delta_ridges(path: Path) -> None:
     ax.set_xlim(0.0, max_x)
     ax.set_ylim(-0.18, offsets[0] + 0.72)
     ax.set_title(
-        "Response-transport fingerprints under interventions",
+        "Interventions reduce event transport",
         pad=10,
         fontweight="semibold",
     )
@@ -944,7 +944,7 @@ def make_firewall_audit(path: Path) -> None:
     ax.set_yticks(np.arange(len(targets)), [label for _, label in targets])
     ax.invert_yaxis()
     ax.set_xlabel("Mean absolute prediction change from full RC-DJB")
-    ax.set_title("Return-mean firewall audit across interventions", pad=10, fontweight="semibold")
+    ax.set_title("RC-DJB keeps return means fixed", pad=10, fontweight="semibold")
     ax.set_xlim(-0.001, max(stat[4] for stat in stats) * 1.18)
     ax.legend(
         handles=[
@@ -1021,7 +1021,7 @@ def make_intervention_story(path: Path) -> None:
     ax.invert_yaxis()
     ax.set_xlabel("Event-row MSE increase relative to full RC-DJB")
     ax.set_title(
-        "A. Text bridge interventions raise event error",
+        "A. Bridge interventions raise event MSE",
         loc="left",
         fontweight="semibold",
     )
@@ -1063,7 +1063,7 @@ def make_intervention_story(path: Path) -> None:
     )
     ax.set_ylabel("Mean absolute response transport")
     ax.set_title(
-        "B. Bridge transport remains larger on disclosures",
+        "B. Event rows keep larger transport",
         loc="left",
         fontweight="semibold",
     )
@@ -1181,7 +1181,7 @@ def make_bridge_activation_ladder(path: Path) -> None:
     ax_transport.axhline(0.0, color="#8091a5", linewidth=0.9)
     ax_transport.set_ylabel("Mean bridge\ntransport")
     ax_transport.set_title(
-        "Bridge activation ladder across held-out real 8-K rows",
+        "Volume drives bridge activation",
         pad=10,
         fontweight="semibold",
     )
@@ -1196,7 +1196,7 @@ def make_bridge_activation_ladder(path: Path) -> None:
     ax_transport.text(
         5.5,
         0.985,
-        "Rows sorted from weakest to strongest response transport",
+        "Weak to strong bridge transport",
         transform=ax_transport.get_xaxis_transform(),
         ha="center",
         va="bottom",
@@ -1206,7 +1206,7 @@ def make_bridge_activation_ladder(path: Path) -> None:
     ax_transport.text(
         1.0,
         float(np.mean(vol_means)) * 1.04,
-        "volatility channel is nearly flat",
+        "volatility nearly flat",
         ha="left",
         va="bottom",
         fontsize=7.4,
@@ -1328,7 +1328,7 @@ def make_monthly_rank_heatmap(path: Path) -> None:
     masked = np.ma.masked_invalid(matrix)
     im = ax.imshow(masked, aspect="auto", cmap=cmap, vmin=-0.35, vmax=0.35)
     ax.set_facecolor("#f8fafc")
-    ax.set_title("Monthly event-rank IC pattern", pad=10, fontweight="semibold")
+    ax.set_title("Monthly Rank IC is unstable", pad=10, fontweight="semibold")
     ax.set_yticks(np.arange(len(models)), models)
     ax.set_xticks(np.arange(len(months)), months, rotation=35, ha="right", fontsize=7)
     ax.tick_params(axis="y", labelsize=8)
