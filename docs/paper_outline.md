@@ -2,7 +2,7 @@
 
 ## Title
 
-Distributional Jump Bridges Improve SEC Disclosure Response Forecasts
+DJB: Distributional Jump Bridges for Disclosure Response Forecasts
 
 ## Thesis
 

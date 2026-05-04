@@ -1,6 +1,6 @@
 # arXiv Submission Metadata
 
-Title: Distributional Jump Bridges Improve SEC Disclosure Response Forecasts
+Title: DJB: Distributional Jump Bridges for Disclosure Response Forecasts
 
 Author: Aryan Gupta
 
