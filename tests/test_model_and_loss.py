@@ -3,7 +3,13 @@ from __future__ import annotations
 import torch
 
 from cebt.models.cebt import CEBTConfig, build_model
-from cebt.training.losses import LossWeights, cebt_loss, gaussian_nll_loss, pairwise_rank_loss
+from cebt.training.losses import (
+    LossWeights,
+    cebt_loss,
+    gaussian_nll_loss,
+    pairwise_rank_loss,
+    supervised_response_loss,
+)
 
 
 def test_cebt_forward_shapes_and_finite_loss() -> None:
@@ -166,3 +172,35 @@ def test_rank_weight_changes_total_loss() -> None:
     rank_loss, metrics = cebt_loss(outputs, targets, is_event, LossWeights(rank_weight=0.5))
     assert metrics["rank"] >= 0.0
     assert rank_loss != base_loss
+
+
+def test_standardized_huber_loss_uses_target_weights() -> None:
+    predictions = torch.tensor([[0.10, 0.02, 0.50], [0.00, -0.01, -0.20]])
+    targets = torch.tensor([[0.00, 0.00, 0.00], [0.10, -0.02, 0.10]])
+    target_mean = torch.mean(targets, dim=0)
+    target_std = torch.std(targets, dim=0, unbiased=False).clamp_min(1e-6)
+    balanced = supervised_response_loss(
+        predictions,
+        targets,
+        LossWeights(
+            supervised_loss="huber",
+            standardize_targets=True,
+            target_weights=(1.0, 1.0, 1.0),
+        ),
+        target_mean=target_mean,
+        target_std=target_std,
+    )
+    abnormal_weighted = supervised_response_loss(
+        predictions,
+        targets,
+        LossWeights(
+            supervised_loss="huber",
+            standardize_targets=True,
+            target_weights=(3.0, 1.0, 0.25),
+        ),
+        target_mean=target_mean,
+        target_std=target_std,
+    )
+    assert torch.isfinite(balanced)
+    assert torch.isfinite(abnormal_weighted)
+    assert balanced != abnormal_weighted

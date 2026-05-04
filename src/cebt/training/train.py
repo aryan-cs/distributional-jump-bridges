@@ -49,6 +49,7 @@ def train_model(
     val_ds = CEBTTensorDataset(feature_path, split=1)
     if len(train_ds) == 0:
         raise ValueError("No training rows in feature bundle.")
+    target_mean, target_std = _target_stats(train_ds, device, loss_weights)
     train_loader = DataLoader(
         train_ds,
         batch_size=int(training.get("batch_size", 32)),
@@ -73,12 +74,30 @@ def train_model(
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast("cuda", enabled=amp_enabled):
                 outputs = model(batch["x_pre"], batch["event_embedding"], batch["metadata"])
-                loss, metrics = cebt_loss(outputs, batch["y"], batch["is_event"], loss_weights)
+                loss, metrics = cebt_loss(
+                    outputs,
+                    batch["y"],
+                    batch["is_event"],
+                    loss_weights,
+                    target_mean=target_mean,
+                    target_std=target_std,
+                )
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
             train_metrics.append(metrics)
-        val_metrics = evaluate_loss(model, val_loader, loss_weights, device) if len(val_ds) else {}
+        val_metrics = (
+            evaluate_loss(
+                model,
+                val_loader,
+                loss_weights,
+                device,
+                target_mean=target_mean,
+                target_std=target_std,
+            )
+            if len(val_ds)
+            else {}
+        )
         history.append(
             {
                 "epoch": epoch + 1,
@@ -89,6 +108,9 @@ def train_model(
     checkpoint = {
         "model_name": model_name,
         "model_config": model_config.__dict__,
+        "loss_config": loss_weights.__dict__,
+        "target_mean": target_mean.detach().cpu().tolist() if target_mean is not None else None,
+        "target_std": target_std.detach().cpu().tolist() if target_std is not None else None,
         "state_dict": model.state_dict(),
         "history": history,
     }
@@ -112,6 +134,8 @@ def evaluate_loss(
     loader: DataLoader,
     loss_weights: LossWeights,
     device: torch.device,
+    target_mean: torch.Tensor | None = None,
+    target_std: torch.Tensor | None = None,
 ) -> dict[str, float]:
     model.eval()
     metrics = []
@@ -119,9 +143,29 @@ def evaluate_loss(
         for batch in loader:
             batch = _to_device(batch, device)
             outputs = model(batch["x_pre"], batch["event_embedding"], batch["metadata"])
-            _, row = cebt_loss(outputs, batch["y"], batch["is_event"], loss_weights)
+            _, row = cebt_loss(
+                outputs,
+                batch["y"],
+                batch["is_event"],
+                loss_weights,
+                target_mean=target_mean,
+                target_std=target_std,
+            )
             metrics.append(row)
     return _mean_metrics(metrics)
+
+
+def _target_stats(
+    train_ds: CEBTTensorDataset,
+    device: torch.device,
+    loss_weights: LossWeights,
+) -> tuple[torch.Tensor | None, torch.Tensor | None]:
+    if not loss_weights.standardize_targets:
+        return None, None
+    y = train_ds.y.to(device)
+    target_mean = torch.mean(y, dim=0)
+    target_std = torch.std(y, dim=0, unbiased=False).clamp_min(1e-6)
+    return target_mean, target_std
 
 
 def _to_device(batch: dict[str, torch.Tensor], device: torch.device) -> dict[str, torch.Tensor]:

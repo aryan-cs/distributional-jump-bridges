@@ -11,6 +11,10 @@ from torch.nn import functional as F
 @dataclass(frozen=True)
 class LossWeights:
     supervised_weight: float = 1.0
+    supervised_loss: str = "mse"
+    standardize_targets: bool = False
+    target_weights: tuple[float, ...] = (1.0, 1.0, 1.0)
+    huber_delta: float = 1.0
     nll_weight: float = 0.0
     control_delta_weight: float = 0.25
     kl_weight: float = 0.01
@@ -21,7 +25,10 @@ class LossWeights:
 
     @classmethod
     def from_dict(cls, row: dict) -> LossWeights:
-        return cls(**{key: row[key] for key in cls.__dataclass_fields__ if key in row})
+        values = {key: row[key] for key in cls.__dataclass_fields__ if key in row}
+        if "target_weights" in values:
+            values["target_weights"] = tuple(float(value) for value in values["target_weights"])
+        return cls(**values)
 
 
 def cebt_loss(
@@ -29,8 +36,16 @@ def cebt_loss(
     targets: torch.Tensor,
     is_event: torch.Tensor,
     weights: LossWeights,
+    target_mean: torch.Tensor | None = None,
+    target_std: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, dict[str, float]]:
-    supervised = F.mse_loss(outputs["prediction"], targets)
+    supervised = supervised_response_loss(
+        outputs["prediction"],
+        targets,
+        weights,
+        target_mean=target_mean,
+        target_std=target_std,
+    )
     nll = gaussian_nll_loss(outputs, targets)
     control_mask = (is_event <= 0.5).float().unsqueeze(-1)
     if torch.sum(control_mask) > 0:
@@ -74,6 +89,38 @@ def cebt_loss(
         "rank": float(rank.detach().cpu()),
     }
     return total, metrics
+
+
+def supervised_response_loss(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    weights: LossWeights,
+    target_mean: torch.Tensor | None = None,
+    target_std: torch.Tensor | None = None,
+) -> torch.Tensor:
+    if weights.standardize_targets:
+        if target_mean is None or target_std is None:
+            raise ValueError("Target standardization requested without target_mean/target_std.")
+        predictions = (predictions - target_mean) / target_std
+        targets = (targets - target_mean) / target_std
+    target_weights = predictions.new_tensor(weights.target_weights)
+    if target_weights.numel() != predictions.shape[-1]:
+        raise ValueError(
+            f"target_weights has {target_weights.numel()} entries, "
+            f"but predictions have {predictions.shape[-1]} targets."
+        )
+    if weights.supervised_loss == "mse":
+        loss = (predictions - targets) ** 2
+    elif weights.supervised_loss in {"huber", "smooth_l1"}:
+        loss = F.smooth_l1_loss(
+            predictions,
+            targets,
+            reduction="none",
+            beta=max(float(weights.huber_delta), 1e-6),
+        )
+    else:
+        raise ValueError(f"Unknown supervised_loss: {weights.supervised_loss}")
+    return torch.mean(loss * target_weights.view(1, -1))
 
 
 def gaussian_nll_loss(outputs: dict[str, torch.Tensor], targets: torch.Tensor) -> torch.Tensor:
