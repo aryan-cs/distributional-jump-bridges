@@ -1,0 +1,18 @@
+project:
+  name: cebt
+  run_name: paper_v3_bge
+seed: 29
+
+model:
+  config_path: "configs/model/djb_bge_small.yaml"
+
+training:
+  epochs: 18
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  amp: true
+  save_best: false
+  split:
+    train_until: "2023-12-31"
+    val_until: "2024-12-31"

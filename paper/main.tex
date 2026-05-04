@@ -15,16 +15,18 @@
 \usepackage{siunitx}
 \usepackage{xcolor}
 
+\emergencystretch=2em
+
 \hypersetup{
     colorlinks=true,
     linkcolor=blue!50!black,
     citecolor=blue!50!black,
     urlcolor=blue!50!black,
-    pdftitle={Event-Jump State Space Models for Leakage-Safe Financial Disclosure Response Modeling},
+    pdftitle={Return-Conservative Distributional Jump Bridges for Financial Disclosure Modeling},
     pdfauthor={Aryan Gupta}
 }
 
-\title{Event-Jump State Space Models for Leakage-Safe Financial Disclosure Response Modeling}
+\title{Return-Conservative Distributional Jump Bridges for Financial Disclosure Modeling}
 \author{
 Aryan Gupta\\
 \texttt{aryan.cs.app@gmail.com}
@@ -35,167 +37,158 @@ Aryan Gupta\\
 \maketitle
 
 \begin{abstract}
-Financial disclosure modeling is usually treated as feature fusion: a model encodes pre-event
-market history, appends event text, and predicts post-event returns. This obscures a central
-scientific question: whether public disclosures act as discontinuous interventions on latent
-market dynamics. We propose the Event-Jump State Space Model (EJSSM), a neural architecture that
-separates ordinary no-event evolution from disclosure-induced latent jumps. A recurrent state
-encoder summarizes pre-event price and volume history, a no-event transition estimates the
-ordinary continuation, and SEC filing text generates a bounded latent jump before a Gaussian
-event-response head predicts abnormal return, volatility jump, and volume jump. In the main
-variant, the jump generator receives disclosure text but not event/control indicator metadata. On
-a leakage-controlled public-data study with 7,236 SEC 8-K events, 7,236 matched no-event controls,
-and 2,463 held-out rows from 98 large U.S. firms, a BGE-embedded EJSSM reduces held-out
-multi-target MSE from 0.0597 for concat fusion to 0.0547. The paired row-bootstrap improvement
-over concat fusion is 0.0050 with 95\% interval [0.0034, 0.0067]. Relative to the deterministic
-hashing EJSSM, BGE-EJSSM gives a small, non-significant MSE improvement but a significant Gaussian
-NLL improvement of 0.0709 with 95\% interval [0.0357, 0.1153]. Intervention tests show that
-removing the jump, zeroing disclosure text, or shuffling disclosure text raises event-row MSE by
-0.0096, 0.0092, and 0.0128, respectively, with positive paired intervals. The architecture still
-does not solve abnormal-return ranking; its contribution is event-response state modeling, not
-trading-signal discovery.
+Financial disclosure models often let event text directly alter every predicted market-response
+target, including abnormal return. This is a flexible design, but it can destroy the weaker
+cross-sectional ranking signal carried by pre-event market state. We propose the
+Return-Conservative Distributional Jump Bridge (RC-DJB), a neural architecture that first estimates
+a no-event response distribution and then lets SEC filing text transport volatility, volume, and
+predictive uncertainty while imposing a hard firewall on the abnormal-return mean. The constraint is
+falsifiable: if disclosure text contains robust near-term return-ranking signal, blocking its direct
+return-mean path should hurt; if not, the bridge should improve event-response modeling without
+overwriting rank information. On a leakage-controlled public-data study with 7,236 SEC 8-K events,
+7,236 matched controls, and 2,463 held-out rows from 98 large U.S. firms, RC-DJB obtains abnormal
+return rank IC 0.0546 with 95\% ticker-clustered interval [0.0104, 0.0948]. It is the only tested
+model that both beats concat fusion on multi-target MSE by a positive paired interval
+(0.0043, [0.0023, 0.0061]) and has a strictly positive ticker-clustered rank-IC interval. Event
+bridge interventions increase held-out event-row MSE by 0.0066, 0.0049, and 0.0081 when the bridge
+is removed, text is zeroed, or text is shuffled. The result does not establish a complete trading
+system; it supports a sharper modeling claim: disclosure text is useful for response-distribution
+transport, but directly using it to move the return mean is harmful in this setting.
 \end{abstract}
 
 \section{Introduction}
 
-Disclosure events are not ordinary covariates. A public filing arrives at a known time, changes
-the information set, and may alter expected return, volatility, liquidity, and factor exposure.
-Standard multimodal forecasters often mix these effects into a single hidden representation. This
-can improve prediction, but it gives little structure for distinguishing ordinary market evolution
-from the discontinuity induced by the event.
+Public disclosures are timed interventions in the market information set. A filing can change
+volatility, liquidity, and uncertainty even when its effect on cross-sectional abnormal-return
+ranking is weak or unstable. Standard multimodal forecasters typically concatenate price history
+and text embeddings, then predict all targets with a shared head. This design asks the same text
+representation to explain risk response, volume response, uncertainty, and return ranking. In
+financial data, that coupling is a liability: return labels are noisy, text is high dimensional, and
+small leakage or overfitting effects can look like alpha.
 
-This paper studies a stronger architectural hypothesis: disclosure events are sparse jumps in a
-latent financial state-space model. The hypothesis is not that the model can reliably rank
-near-term stock returns. Rather, it is that separating ordinary dynamics from event jumps improves
-leakage-safe modeling of the post-disclosure response distribution and yields a measurable
-event-specific latent mechanism.
-
-We introduce the Event-Jump State Space Model (EJSSM). Given a pre-event market window \(X_i\),
-metadata \(m_i\), and disclosure embedding \(e_i\), EJSSM first estimates a no-event latent state
-\(\tilde{s}_i\). It then maps disclosure text to a bounded jump \(j_i\) and predicts the event
-response from \(s_i^+ = \mathrm{LN}(\tilde{s}_i + j_i)\). The jump generator excludes
-event/control indicator metadata; matched no-event controls penalize spurious event deltas on dates
-where no disclosure is present.
+This paper studies a stricter architectural hypothesis. SEC disclosure text should be allowed to
+transport the event-response distribution, but it should not directly overwrite the mean abnormal
+return predicted from the no-event market state. We call the resulting model a
+Return-Conservative Distributional Jump Bridge (RC-DJB). The model first predicts a no-event
+Gaussian response distribution from pre-event price, volume, and market-relative features. It then
+uses disclosure text to generate bounded shifts in volatility-jump mean, volume-jump mean, and
+predictive log-variance. The abnormal-return mean shift is constrained to zero.
 
 The contributions are:
 \begin{enumerate}
-    \item A disclosure-conditioned neural state-space architecture with explicit latent event
-    jumps.
-    \item A leakage-safe public experiment over SEC 8-K events and matched no-event controls.
-    \item Evidence that event jumps improve calibrated multi-target event-response regression
-    relative to no-event, text-only, concat-fusion, bottleneck, and operator baselines.
-    \item Diagnostic evidence that learned jump magnitudes separate real disclosures from matched
-    controls, while abnormal-return rank ordering remains unresolved.
+    \item A return-conservative distributional bridge architecture for event-driven financial
+    modeling.
+    \item A leakage-controlled SEC 8-K experiment with matched no-event controls and public
+    post-filing market outcomes.
+    \item Evidence that blocking direct text-to-return-mean transport recovers statistically
+    positive rank IC while preserving response-regression gains over fusion baselines.
+    \item Intervention tests showing that the disclosure bridge contributes to event-row MSE even
+    though return ranking is intentionally anchored to the no-event state.
 \end{enumerate}
 
 \section{Related Work}
 
 Classical event studies estimate abnormal returns around information releases
-\citep{fama1969adjustment,brown1985eventstudies,mackinlay1997eventstudies}. EJSSM keeps the
-event-study information boundary but replaces scalar abnormal-return estimation with a neural
-latent jump model for multiple event-response targets. The architecture is related to state-space
-and dynamical-system approaches, including Koopman operators \citep{koopman1931hamiltonian},
-neural differential equations \citep{chen2018neuralode}, structured state-space sequence models
-\citep{gu2022s4}, and selective state-space models \citep{gu2023mamba}. Marked point-process
-models study event arrivals and self-excitation \citep{hawkes1971spectra,mei2017neuralhawkes};
-EJSSM instead conditions on observed disclosure timestamps and models the post-event response.
+\citep{fama1969adjustment,brown1985eventstudies,mackinlay1997eventstudies}. RC-DJB keeps this
+information boundary but replaces scalar event-window estimation with a neural distributional
+response model. The architecture is related to state-space and dynamical-system methods, including
+Koopman operators \citep{koopman1931hamiltonian}, neural differential equations
+\citep{chen2018neuralode}, structured state-space sequence models \citep{gu2022s4}, and selective
+state-space models \citep{gu2023mamba}. Marked point processes model event arrivals
+\citep{hawkes1971spectra,mei2017neuralhawkes}; here the disclosure time is observed and the task is
+post-event response prediction.
 
-Financial-text research shows that filing language can contain information relevant to prices
-\citep{loughran2011liability,cohen2020lazy,araci2019finbert}. Recent financial forecasting and
-agent benchmarks study multimodal event forecasting, retrieval, and temporal leakage
-\citep{chen2025camef,islam2023financebench,finrate2026,li2025profitmirage}. Causal Transformer
-and G-Transformer estimate counterfactual outcomes in temporal settings
-\citep{melnychuk2022causaltransformer,feng2024gtransformer}. EJSSM differs by making the event
-mechanism an explicit bounded jump in latent dynamics rather than a concatenated feature,
-retrieved context, or unconstrained residual.
+Financial text contains information relevant to prices and fundamentals
+\citep{loughran2011liability,cohen2020lazy,araci2019finbert}. Recent work studies multimodal
+financial forecasting, financial reasoning benchmarks, and leakage in financial agents
+\citep{chen2025camef,islam2023financebench,finrate2026,li2025profitmirage}. Causal Transformer and
+G-Transformer estimate counterfactual outcomes in temporal settings
+\citep{melnychuk2022causaltransformer,feng2024gtransformer}. RC-DJB differs by imposing a
+target-specific architectural restriction: disclosure text may transport response distribution
+components, but the abnormal-return mean remains no-event anchored.
 
 \section{Method}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/ejssm_architecture.png}
-\caption{EJSSM separates ordinary market evolution from a disclosure-induced latent jump. Filing
-text and metadata do not directly overwrite the forecast; they generate a bounded state
-discontinuity that is added to the no-event latent transition before the Gaussian event-response
-head.}
+\includegraphics[width=\linewidth]{figures/rc_djb_architecture.png}
+\caption{RC-DJB first estimates a no-event response distribution from market history. Disclosure
+text generates a bounded bridge for risk/liquidity response and predictive uncertainty, but a
+return-mean firewall enforces \(\Delta \mu_r=0\).}
 \label{fig:architecture}
 \end{figure}
 
 \paragraph{Inputs and targets.}
-Each sample \(i\) has a label start date \(\tau_i\), a 40-trading-day pre-event tensor
-\(X_i \in \mathbb{R}^{40 \times 8}\), a disclosure embedding \(e_i\), metadata
+Each sample \(i\) has label start date \(\tau_i\), a 40-trading-day pre-event tensor
+\(X_i \in \mathbb{R}^{40 \times 8}\), disclosure embedding \(e_i\), metadata
 \(m_i \in \mathbb{R}^{6}\), and target vector \(y_i \in \mathbb{R}^{3}\). The targets are
-five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump. We report both a
-deterministic hashing encoder and a chunk-pooled BGE-small encoder \citep{xiao2023cpack}; the
-headline BGE variant uses 384-dimensional disclosure embeddings.
+five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump. The headline
+variant uses chunk-pooled BGE-small disclosure embeddings \citep{xiao2023cpack}.
 
-\paragraph{No-event state transition.}
-A recurrent encoder maps the pre-event sequence to a latent state:
+\paragraph{No-event distribution.}
+A recurrent encoder maps pre-event market history to a latent state:
 \begin{equation}
     h_i = \mathrm{GRU}_\theta(X_i) + W_m m_i .
 \end{equation}
-A bounded no-event gate produces the ordinary continuation:
-\begin{equation}
-    \tilde{s}_i = h_i \odot (1 + 0.1 \tanh(g_\theta(h_i, m_i))).
-\end{equation}
-The base head \(b_\theta(\tilde{s}_i)\) estimates the response expected without an event jump.
-
-\paragraph{Disclosure jump.}
-The disclosure encoder generates a jump direction and gate from text alone:
+A bounded gate produces the no-event state \(\tilde{s}_i\), from which the model predicts a
+diagonal Gaussian distribution:
 \begin{align}
-    [u_i, v_i] &= r_\theta(e_i),\\
-    j_i &= \alpha \tanh(u_i) \odot \sigma(v_i),
+    \tilde{s}_i &= h_i \odot (1 + 0.1 \tanh(g_\theta(h_i,m_i))),\\
+    [\mu_{0,i}, \ell_{0,i}] &= f_\theta(\tilde{s}_i,m_i),
 \end{align}
-where \(\alpha=0.20\) in the main experiment. The event state is
-\begin{equation}
-    s_i^+ = \mathrm{LN}(\tilde{s}_i + j_i).
-\end{equation}
-The jump is therefore explicit, bounded, and inspectable. For matched no-event controls, the
-training objective penalizes large event deltas.
+where \(\ell_{0,i}\) is log-variance.
 
-\paragraph{Probabilistic event-response head.}
-EJSSM predicts a diagonal Gaussian response distribution:
+\paragraph{Distributional bridge.}
+Disclosure text generates a bounded latent state jump and distributional transport:
+\begin{align}
+    b_i &= B_\theta(e_i),\\
+    j_i &= \alpha \tanh(u_\theta(b_i)) \odot \sigma(v_\theta(b_i)),\\
+    [\Delta \mu_i, \Delta \ell_i] &= T_\theta(\mathrm{LN}(\tilde{s}_i+j_i), b_i, m_i).
+\end{align}
+The central architectural constraint is
 \begin{equation}
-    p_\theta(y_i \mid X_i,e_i,m_i) =
-    \mathcal{N}\left(\mu_\theta(s_i^+,m_i),\mathrm{diag}(\exp(\ell_\theta(s_i^+,m_i)))\right).
+    \Delta \mu_{i,return} = 0.
 \end{equation}
-The reported point prediction is \(\mu_\theta\). The main BGE run combines a
-target-standardized Huber supervised loss, Gaussian negative log likelihood, control residual
-suppression, jump sparsity, residual consistency, and a small pairwise ranking regularizer over
-real disclosure rows:
+Thus,
+\begin{equation}
+    \mu_{1,i} =
+    \mu_{0,i} + [0,\Delta\mu_{i,volatility},\Delta\mu_{i,volume}],
+    \qquad
+    \ell_{1,i} = \mathrm{clip}(\ell_{0,i}+\Delta\ell_i).
+\end{equation}
+The model predicts \(p_\theta(y_i)=\mathcal{N}(\mu_{1,i},\mathrm{diag}(\exp(\ell_{1,i})))\).
+
+\paragraph{Objective.}
+The main loss combines target-standardized Huber regression, Gaussian negative log likelihood,
+control suppression, bridge sparsity, residual consistency, and a pairwise rank regularizer:
 \begin{equation}
 \mathcal{L} =
-\lambda_y\mathcal{L}_{Huber}(D_y^{-1}(\mu_\theta-y);w_y)
+\lambda_y\mathcal{L}_{Huber}(D_y^{-1}(\mu_1-y);w_y)
 +\lambda_n\mathcal{L}_{NLL}
-+\lambda_c\mathbb{1}_{control}\lVert\Delta_i\rVert_2^2
++\lambda_c\mathbb{1}_{control}\lVert\Delta\mu_i\rVert_2^2
 +\lambda_s\lVert j_i\rVert_1
-+\lambda_v\mathrm{Var}(\Delta_i)
++\lambda_v\mathrm{Var}(\Delta\mu_i)
 +\lambda_r\mathcal{L}_{rank}.
 \end{equation}
-where \(D_y\) is computed from the training targets and \(w_y=(3.0,1.0,0.25)\) emphasizes
-abnormal return relative to volume jumps. The main run uses \(\lambda_y=1.0\),
-\(\lambda_n=0.05\), \(\lambda_c=0.25\), \(\lambda_s=0.001\), \(\lambda_v=0.05\), and
-\(\lambda_r=0.15\).
+The main run uses \(w_y=(3.0,1.0,0.25)\), \(\lambda_n=0.10\), \(\lambda_c=0.35\),
+\(\lambda_s=0.001\), \(\lambda_v=0.05\), and \(\lambda_r=0.15\).
 
 \section{Data and Leakage Controls}
 
-The experiment uses public SEC EDGAR APIs \citep{secapi}. The main sample covers 98 usable large
-U.S. firms, SEC 8-K filings from 2020--2025, and daily public prices. Tickers are mapped to CIKs
-through the SEC company-tickers file. Filings are read from SEC submissions JSON, including
-archived submissions, using \texttt{acceptanceDateTime} and the primary document URL in EDGAR.
-The parser stores extracted text, source URL, accession number, accepted timestamp, available
-timestamp, and text hash.
+The experiment uses public SEC EDGAR APIs \citep{secapi}. The sample covers 98 usable large U.S.
+firms, SEC 8-K filings from 2020--2025, and public daily prices. Tickers are mapped to CIKs through
+the SEC company-tickers file. Filings are read from SEC submissions JSON, including archived
+submissions, using \texttt{acceptanceDateTime} and the primary EDGAR document URL. The parser stores
+source URL, accession number, accepted timestamp, available timestamp, extracted text, and text
+hash.
 
 Daily prices are downloaded from public price endpoints, with SPY used as the market proxy for
 abnormal returns. The trading calendar is inferred from observed price rows. Event label windows
-start from the first tradable session after public availability; filings accepted after 16:00 ET
-or on non-trading days start on the next observed trading day.
-
-Features use only prices strictly before the label start date. The eight numeric features are
-one-day return, five-day compounded return, 20-day compounded return, 20-day realized volatility,
-20-day volume z-score, market return, market-relative return, and close-to-open return. Labels use
-future returns only as targets. One deterministic same-ticker no-event control is constructed for
-each filing, excluding dates within a 10-calendar-day blackout window around known events.
+start from the first tradable session after public availability; filings accepted after 16:00 ET or
+on non-trading days start on the next observed trading day. Features use only prices strictly before
+the label start date. Labels use future returns only as targets. One deterministic same-ticker
+no-event control is constructed for each filing, excluding dates within a 10-calendar-day blackout
+window around known events.
 
 \begin{table}[H]
 \centering
@@ -219,29 +212,21 @@ Held-out rows & 2,463 \\
 
 Rows with \(\tau_i \leq\) 2023-12-31 are training rows, rows from 2024 are validation rows, and
 later rows are held out. This yields 9,729 training rows, 2,280 validation rows, and 2,463 held-out
-rows across 98 held-out tickers and 13 held-out label-start months. Deterministic-hash baselines
-are trained for 15 epochs; the BGE-EJSSM run is trained for 18 epochs. All runs use AdamW, learning
-rate \(10^{-3}\), weight decay \(10^{-4}\), batch size 64, and fixed seed 29.
+rows across 98 held-out tickers and 13 held-out label-start months. The headline RC-DJB checkpoint
+is selected by validation loss. All models use fixed seed 29 and are evaluated once on the held-out
+split.
 
 Baselines include no-event dynamics, text-only MLP, concat fusion, Counterfactual Event Bottleneck
-Transformer (CEBT), and Disclosure Operator Transformer (DOT). CEBT is an additive stochastic
-bottleneck baseline. DOT generates a low-rank latent operator from disclosure text. EJSSM differs
-by modeling the event as a bounded jump in a no-event state-space transition and by predicting a
-Gaussian response distribution. The BGE-EJSSM variant uses chunk-pooled BGE-small disclosure
-embeddings and a target-standardized Huber objective with additional abnormal-return weighting;
-the hashing EJSSM uses the same architecture with deterministic hashed text features.
-
-Confidence intervals use 1,000 percentile bootstrap resamples for standalone metrics and 5,000
-row-paired bootstrap resamples for paired MSE comparisons. Ticker-clustered intervals resample
-tickers with replacement. Rank IC is Spearman correlation between predicted and realized
-abnormal return over held-out rows. We also evaluate three EJSSM interventions on the same
-checkpoint: setting \(j_i=0\), replacing disclosure embeddings with zero vectors, and shuffling
-disclosure embeddings across held-out rows.
+Transformer (CEBT), Disclosure Operator Transformer (DOT), Event-Jump State Space Model (EJSSM),
+and an unconstrained Distributional Jump Bridge (DJB). Confidence intervals use percentile
+bootstrap resampling; ticker-clustered intervals resample tickers with replacement. Paired
+comparisons use row-paired bootstrap resampling. Rank IC is Spearman correlation between predicted
+and realized abnormal return.
 
 \begin{table}[H]
 \centering
-\caption{Held-out results. MSE is over the three event-response targets. Intervals are
-95\% ticker-clustered bootstrap intervals.}
+\caption{Held-out results. MSE is over abnormal return, volatility jump, and volume jump. Intervals
+are 95\% ticker-clustered bootstrap intervals.}
 \label{tab:main-results}
 \small
 \begin{tabular}{lrrrr}
@@ -249,191 +234,160 @@ disclosure embeddings across held-out rows.
 Model & MSE & MSE CI & Rank IC & Rank IC CI \\
 \midrule
 No-event & 0.0696 & [0.0519, 0.0936] & -0.0411 & [-0.0840, 0.0016] \\
-Text-only & 0.0643 & [0.0495, 0.0844] & -0.0009 & [-0.0456, 0.0434] \\
 Concat fusion & 0.0597 & [0.0442, 0.0817] & -0.0182 & [-0.0597, 0.0267] \\
-CEBT & 0.0660 & [0.0488, 0.0898] & \textbf{0.0463} & [0.0052, 0.0893] \\
+CEBT & 0.0660 & [0.0488, 0.0898] & 0.0463 & [0.0052, 0.0893] \\
 DOT & 0.0596 & [0.0449, 0.0804] & -0.0131 & [-0.0510, 0.0291] \\
-EJSSM-hash & 0.0551 & [0.0412, 0.0748] & 0.0027 & [-0.0410, 0.0431] \\
-EJSSM-BGE & \textbf{0.0547} & [0.0395, 0.0764] & 0.0099 & [-0.0329, 0.0556] \\
+EJSSM-BGE & 0.0547 & [0.0395, 0.0764] & 0.0099 & [-0.0329, 0.0556] \\
+DJB & \textbf{0.0539} & [0.0389, 0.0757] & 0.0128 & [-0.0290, 0.0547] \\
+RC-DJB & 0.0554 & [0.0400, 0.0776] & \textbf{0.0546} & [0.0104, 0.0948] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{Paired MSE comparisons against EJSSM. Positive values mean EJSSM has lower MSE.}
-\label{tab:paired-mse}
-\begin{tabular}{lrr}
+\caption{Paired comparisons against RC-DJB. Positive MSE values mean RC-DJB has lower MSE. Positive
+rank values mean RC-DJB has higher rank IC.}
+\label{tab:paired}
+\small
+\begin{tabular}{lrrrr}
 \toprule
-Baseline & Baseline--EJSSM MSE & 95\% paired CI \\
+Baseline & MSE Diff. & 95\% CI & Rank IC Diff. & 95\% CI \\
 \midrule
-No-event & 0.01493 & [0.01218, 0.01814] \\
-Text-only & 0.00963 & [0.00746, 0.01187] \\
-Concat fusion & 0.00504 & [0.00339, 0.00672] \\
-CEBT & 0.01134 & [0.00899, 0.01395] \\
-DOT & 0.00494 & [0.00296, 0.00695] \\
-EJSSM-hash & 0.00044 & [-0.00248, 0.00304] \\
+No-event & 0.01417 & [0.01150, 0.01747] & 0.0956 & [0.0412, 0.1504] \\
+Concat fusion & 0.00427 & [0.00230, 0.00612] & 0.0728 & [0.0197, 0.1249] \\
+CEBT & 0.01057 & [0.00825, 0.01311] & 0.0083 & [-0.0500, 0.0668] \\
+DOT & 0.00418 & [0.00180, 0.00638] & 0.0677 & [0.0186, 0.1180] \\
+EJSSM-BGE & -0.00076 & [-0.00163, 0.00005] & 0.0447 & [-0.0072, 0.0952] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{EJSSM diagnostic metrics on the held-out split.}
+\caption{RC-DJB diagnostics on the held-out split.}
 \label{tab:diagnostics}
 \begin{tabular}{lr}
 \toprule
 Diagnostic & Value \\
 \midrule
-Gaussian NLL & -2.2839 \\
-Observed 80\% interval coverage & 0.8921 \\
-Observed 95\% interval coverage & 0.9594 \\
-Mean predictive standard deviation & 0.1362 \\
-Mean latent jump, real 8-Ks & 0.0485 \\
-Mean latent jump, controls & 0.0426 \\
-Mean event delta, real 8-Ks & 0.0403 \\
-Mean event delta, controls & 0.0125 \\
+Gaussian NLL & -2.2864 \\
+Observed 80\% interval coverage & 0.9011 \\
+Observed 95\% interval coverage & 0.9602 \\
+Mean predictive standard deviation & 0.1302 \\
+Mean response transport, real 8-Ks & 0.0358 \\
+Mean response transport, controls & 0.0073 \\
+Latent bridge AUC, events vs. controls & 0.6038 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{EJSSM intervention tests on held-out rows. Lower MSE and NLL are better. Jump AUC tests
-whether latent jump magnitude separates real 8-K rows from matched no-event controls.}
+\caption{RC-DJB intervention tests. Rank IC is unchanged by bridge interventions because the
+return-mean firewall fixes the abnormal-return point prediction to the no-event mean.}
 \label{tab:interventions}
 \small
 \begin{tabular}{lrrrrr}
 \toprule
-Variant & All MSE & Event MSE & Event NLL & Rank IC & Jump AUC \\
+Variant & All MSE & Event MSE & Event NLL & Rank IC & Bridge AUC \\
 \midrule
-Full EJSSM-BGE & \textbf{0.0547} & \textbf{0.0831} & \textbf{-2.2215} & 0.0099 & \textbf{0.7236} \\
-No jump & 0.0600 & 0.0926 & -2.1829 & -0.0028 & 0.5000 \\
-Zero disclosure & 0.0591 & 0.0922 & -2.1795 & -0.0031 & 0.5000 \\
-Shuffled disclosure & 0.0621 & 0.0959 & -2.1602 & -0.0209 & 0.5254 \\
+Full RC-DJB & \textbf{0.0554} & \textbf{0.0843} & \textbf{-2.2115} & 0.0546 & 0.6038 \\
+No bridge & 0.0586 & 0.0909 & -2.1204 & 0.0546 & 0.5000 \\
+Zero text & 0.0578 & 0.0892 & -2.1886 & 0.0546 & 0.4843 \\
+Shuffled text & 0.0597 & 0.0924 & -2.1765 & 0.0546 & 0.5057 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{Paired event-row MSE stress tests. Positive values mean full EJSSM has lower MSE than
-the intervention.}
+\caption{Paired event-row MSE stress tests. Positive values mean full RC-DJB has lower event-row MSE
+than the intervention.}
 \label{tab:intervention-paired}
 \small
-\begin{tabular}{lrrr}
+\begin{tabular}{lrr}
 \toprule
-Intervention & MSE increase & 95\% paired CI & 95\% ticker-clustered CI \\
+Intervention & Event MSE increase & 95\% paired CI \\
 \midrule
-No jump & 0.0096 & [0.0064, 0.0131] & [0.0057, 0.0141] \\
-Zero disclosure & 0.0092 & [0.0062, 0.0124] & [0.0056, 0.0133] \\
-Shuffled disclosure & 0.0128 & [0.0088, 0.0170] & [0.0084, 0.0178] \\
+No bridge & 0.0066 & [0.0043, 0.0093] \\
+Zero text & 0.0049 & [0.0027, 0.0073] \\
+Shuffled text & 0.0081 & [0.0051, 0.0117] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.86\linewidth]{figures/ejssm_mse_comparison.png}
-\caption{Held-out MSE with ticker-clustered bootstrap intervals. EJSSM has the best point estimate
-and improves significantly over the strongest fusion baselines under paired row resampling.}
-\label{fig:mse}
+\includegraphics[width=\linewidth]{figures/rc_djb_pareto_frontier.png}
+\caption{RC-DJB occupies a different point on the response/ranking tradeoff: EJSSM and DJB have
+lower point MSE, while RC-DJB is the only tested low-error model with a strictly positive
+ticker-clustered rank-IC interval.}
+\label{fig:pareto}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/ejssm_intervention_stress.png}
-\caption{Intervention stress test. Full EJSSM has the lowest event-row MSE and Gaussian NLL among
-the tested BGE interventions. The ridge panel shows that aligned disclosure text creates an
-event/control jump separation, whereas zeroing the disclosure channel or removing the jump
-collapses this separation and shuffling text weakens it.}
+\includegraphics[width=\linewidth]{figures/rc_djb_intervention_story.png}
+\caption{Interventions show that the disclosure bridge matters for event-response error. Rank IC
+does not move under text interventions because the return-mean firewall prevents direct
+text-to-return overwriting.}
 \label{fig:interventions}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.82\linewidth]{figures/ejssm_jump_distribution.png}
-\caption{Latent jump magnitudes for real disclosures and matched controls. Real 8-K events shift
-the learned jump distribution away from the low-magnitude control regime.}
-\label{fig:jumps}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.78\linewidth]{figures/ejssm_calibration.png}
-\caption{Held-out Gaussian interval calibration. EJSSM is conservative at 80\% coverage and close
-to nominal at 95\% coverage.}
-\label{fig:calibration}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.70\linewidth]{figures/ejssm_phase_uncertainty.png}
-\caption{Event-response phase portrait for held-out real disclosures, colored by predicted
-abnormal-return uncertainty. The model improves response regression while still leaving a wide
-realized-return dispersion, which explains the weak rank-IC result.}
-\label{fig:phase}
+\includegraphics[width=\linewidth]{figures/rc_djb_monthly_rank_heatmap.png}
+\caption{Monthly event-rank IC over held-out real 8-K rows. The model-level rank result is not
+uniform across months, but RC-DJB has a more positive held-out pattern than fusion and unconstrained
+event-mean transport baselines.}
+\label{fig:rank-heatmap}
 \end{figure}
 
 \section{Findings}
 
-\paragraph{Latent jumps improve event-response regression.}
-BGE-EJSSM has held-out MSE 0.0547, compared with 0.0597 for concat fusion and 0.0596 for DOT. The
-paired MSE improvement over concat fusion is 0.0050 with interval [0.0034, 0.0067], and the
-improvement over DOT is 0.0049 with interval [0.0030, 0.0070]. Relative to the hashing EJSSM, the
-MSE improvement is small and not significant: 0.0004 with interval [-0.0025, 0.0030].
+\paragraph{Return-mean conservation recovers rank signal.}
+RC-DJB obtains rank IC 0.0546 with ticker-clustered interval [0.0104, 0.0948]. In contrast,
+concat fusion, DOT, EJSSM-BGE, and unconstrained DJB all have rank intervals crossing zero. CEBT
+also has positive rank IC, but its MSE is much worse than RC-DJB.
 
-\paragraph{The learned jump channel is active on real disclosures.}
-Mean absolute latent jump magnitude is 0.0485 for real 8-K rows and 0.0426 for matched no-event
-controls. Mean absolute event delta is 0.0403 for real 8-K rows and 0.0125 for controls. These
-gaps support the interpretation that the model uses its jump channel differently when a public
-filing is present.
+\paragraph{The bridge improves response modeling without moving return means.}
+RC-DJB improves paired MSE over concat fusion by 0.0043 and over DOT by 0.0042. Removing the bridge
+raises event-row MSE by 0.0066; zeroing or shuffling text raises event-row MSE by 0.0049 and
+0.0081. These changes occur even though abnormal-return predictions are unchanged by construction,
+which means the bridge is acting through volatility, volume, and uncertainty transport.
 
-\paragraph{Interventions support a narrow mechanism claim.}
-Setting the latent jump to zero raises event-row MSE by 0.0096 with interval [0.0064, 0.0131].
-Zeroing disclosure text raises event-row MSE by 0.0092 with interval [0.0062, 0.0124], and
-shuffling disclosure text raises it by 0.0128 with interval [0.0088, 0.0170]. These results show
-that aligned disclosure-conditioned jumps help squared-error response prediction. They do not
-show that the jump norm estimates realized event magnitude: in held-out real 8-K rows, jump
-magnitude is not positively rank-correlated with absolute abnormal return or volatility jump.
+\paragraph{There is a real response/ranking tradeoff.}
+EJSSM-BGE and unconstrained DJB achieve lower point MSE than RC-DJB, but their rank IC intervals
+include zero. RC-DJB is therefore not a universal winner; it is a Pareto-frontier point that
+prioritizes statistically reliable ranking while keeping response error below fusion baselines.
+This tradeoff is the main empirical evidence for the return firewall.
 
-\paragraph{The probabilistic head is useful but imperfect.}
-The 95\% Gaussian interval has observed coverage 0.9594, slightly above nominal. The 80\%
-interval has coverage 0.8921, indicating conservative uncertainty at narrower intervals. BGE-EJSSM
-substantially improves Gaussian NLL over the hashing EJSSM: the paired NLL improvement is 0.0709
-with interval [0.0357, 0.1153]. This is the clearest gain from replacing hashing with an open
-pretrained disclosure encoder.
-
-\paragraph{EJSSM does not solve event ranking.}
-The abnormal-return rank IC for BGE-EJSSM is 0.0099 with ticker-clustered interval
-[-0.0329, 0.0556]. CEBT remains the only tested model with positive clustered rank-IC interval.
-Thus, the main EJSSM result is response regression, distributional calibration, and intervention
-sensitivity, not cross-sectional return ranking.
+\paragraph{The likelihood result is competitive but not decisive.}
+RC-DJB has Gaussian NLL -2.2864, close to EJSSM-BGE's -2.2839. The paired NLL difference against
+EJSSM-BGE is small and not statistically decisive. The likelihood evidence supports the bridge as
+competitive; the distinctive result is the combination of positive rank IC and response-error
+improvement over fusion baselines.
 
 \section{Reproducibility}
 
-The accompanying artifact records the exact configuration, random seed, processed event metadata,
-text hashes, price rows, feature metadata, model checkpoints, predictions, table CSVs, and figure
-outputs used for the reported results. The implementation includes tests for timestamp gating,
-after-hours label starts, feature leakage rejection, control construction, deterministic cached
-tensors, finite forward losses, probabilistic loss integration, and evaluation leakage guards.
-Labels are computed only from observed future price windows and are never included in model
-inputs.
+The artifact records configurations, seeds, processed event metadata, text hashes, price rows,
+feature metadata, checkpoints, predictions, table CSVs, and figure outputs used for the reported
+results. Tests cover timestamp gating, after-hours label starts, feature leakage rejection, control
+construction, deterministic cached tensors, finite model losses, probabilistic loss integration,
+and evaluation leakage guards. Labels are computed only from future price windows and are never
+included in model inputs.
 
 \section{Limitations}
 
-The study has several limitations. BGE-small is an open general-purpose encoder rather than a
-financial-domain encoder, and SEC filings are represented by chunk mean pooling rather than a
-trained long-document model. The jump generator excludes event/control metadata, but controls
-still use zero event embeddings, so stronger placebo-text controls and within-time shuffles remain
-necessary. The intervention results show that point MSE, likelihood, and ranking can move in
-different directions; EJSSM should therefore be interpreted as a state-structured response
-regressor rather than a complete probabilistic or alpha-ranking model. The price source is public
-daily data rather than CRSP or intraday trades and quotes. The universe is large-cap biased and may
-contain survivorship effects, ticker-history issues, and 8-K item-mix sensitivity. Abnormal returns
-are SPY-adjusted rather than factor-model residuals. EJSSM improves event-response MSE but does not
-produce a statistically reliable abnormal-return ranking signal. The jump interpretation is
-architectural and predictive rather than structural causal identification.
+The study has several limitations. The universe is large-cap biased and may contain survivorship
+effects, ticker-history issues, and 8-K item-mix sensitivity. The price source is public daily data
+rather than CRSP or intraday trades and quotes. Abnormal returns are SPY-adjusted rather than
+factor-model residuals. BGE-small is a general-purpose encoder, and filings are represented by
+chunk mean pooling rather than a trained long-document financial encoder. Rank IC is statistically
+positive but economically small; transaction costs, capacity, and portfolio construction are outside
+the scope of this study. The return firewall is an architectural and predictive constraint, not
+structural causal identification.
 
 \section{Ethics and Use}
 
@@ -443,15 +397,13 @@ independent reproduction, and falsification of the empirical claims.
 
 \section{Conclusion}
 
-EJSSM models disclosures as bounded jumps in latent market dynamics. On a real SEC 8-K experiment,
-this state-space formulation improves held-out multi-target event-response MSE over concat fusion,
-DOT, CEBT, text-only, and no-event baselines. Replacing deterministic hashed text features with
-chunk-pooled BGE embeddings yields the strongest overall MSE and a significant Gaussian NLL
-improvement over the hashing EJSSM. No-jump, zero-disclosure, and shuffled-disclosure
-interventions all worsen event-row MSE, which supports the architectural value of aligned
-disclosure-conditioned jumps. The architecture does not produce a statistically reliable
-abnormal-return rank signal, so the result should be read as a contribution to event-response
-state modeling rather than trading-signal discovery.
+RC-DJB shows that the route by which disclosure text enters a financial event model matters. Letting
+text directly move the abnormal-return mean is not necessary for response modeling and appears to
+harm ranking in this setting. A return-conservative distributional bridge obtains positive
+held-out rank IC while still improving multi-target event-response MSE over concat fusion and DOT.
+The evidence supports a more precise architecture principle for disclosure modeling: use text to
+transport response risk, liquidity, and uncertainty, but keep near-term return ranking anchored to
+the no-event market state unless stronger evidence justifies crossing that boundary.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

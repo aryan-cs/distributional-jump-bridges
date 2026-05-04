@@ -1,26 +1,27 @@
-# EJSSM: Event-Jump State Space Models for Financial Disclosures
+# RC-DJB: Return-Conservative Disclosure Jump Bridges
 
-This repository studies event-driven financial modeling as a latent dynamics problem. The current
-paper centers on the **Event-Jump State Space Model (EJSSM)**:
+This repository studies event-driven financial modeling as a latent distribution-transport problem.
+The current paper centers on the **Return-Conservative Distributional Jump Bridge (RC-DJB)**:
 
-> Public disclosures can be modeled as bounded jumps in a latent market state. Separating ordinary
-> no-event evolution from disclosure-induced jumps improves leakage-safe event-response modeling
-> and produces inspectable jump diagnostics.
+> Public disclosures should transport response risk, liquidity, and uncertainty, but should not
+> directly overwrite the no-event abnormal-return mean unless the evidence supports that path.
+> A return-mean firewall recovers statistically positive held-out rank IC while preserving
+> leakage-safe response-regression gains over fusion baselines.
 
 The experimental target is SEC 8-K disclosures because they have public accepted timestamps and
 observable post-event market responses. Earlier CEBT and DOT architectures remain in the codebase
-as baselines.
+as baselines; EJSSM and unconstrained DJB are stronger state/bridge baselines.
 
 ## Why This Is Novel
 
-EJSSM is positioned against event-driven forecasting and temporal leakage work:
+RC-DJB is positioned against event-driven forecasting and temporal leakage work:
 
-- CAMEF uses causal-augmented multi-modal financial forecasting, but EJSSM makes the disclosure
-  effect an explicit jump in latent state dynamics.
-- Causal Transformer and G-Transformer estimate counterfactual outcomes over time, while EJSSM
-  targets observed SEC disclosure timestamps and event-response distributions.
-- State-space and Koopman-style models learn temporal dynamics, but typically do not condition
-  latent jumps on disclosure text.
+- CAMEF uses causal-augmented multi-modal financial forecasting, but RC-DJB makes the disclosure
+  effect a constrained transport from a no-event distribution to an event-response distribution.
+- Causal Transformer and G-Transformer estimate counterfactual outcomes over time, while RC-DJB
+  targets observed SEC disclosure timestamps with a hard return-mean conservation constraint.
+- State-space and Koopman-style models learn temporal dynamics, but typically do not test whether
+  disclosure text should be blocked from directly shifting return means.
 - Profit Mirage studies leakage in financial agents; this repo builds timestamp gates into feature
   construction and evaluation.
 
@@ -89,10 +90,20 @@ uv run python scripts/50_eval.py --config configs/paper_v3_ejssm.yaml --model-na
 uv run python scripts/70_make_tables.py --config configs/paper_v3.yaml --output-dir data/runs/paper_v3
 ```
 
-Then build the BGE-small disclosure embeddings and train the headline EJSSM run:
+Then build the BGE-small disclosure embeddings and train the headline RC-DJB run:
 
 ```bash
 uv run python scripts/30_build_features.py --config configs/paper_v3_bge.yaml --output-dir data/processed/paper_v3_bge
+uv run python scripts/40_train.py --config configs/paper_v3_bge_rc_djb.yaml --model-name rc_djb --output-dir data/runs/paper_v3_bge_rc_djb_best
+uv run python scripts/50_eval.py --config configs/paper_v3_bge_rc_djb.yaml --model-name rc_djb --output-dir data/runs/paper_v3_bge_rc_djb_best
+uv run python scripts/50_eval.py --config configs/paper_v3_bge_rc_djb.yaml --model-name rc_djb --output-dir data/runs/paper_v3_bge_rc_djb_best --intervention no_jump
+uv run python scripts/50_eval.py --config configs/paper_v3_bge_rc_djb.yaml --model-name rc_djb --output-dir data/runs/paper_v3_bge_rc_djb_best --intervention zero_event
+uv run python scripts/50_eval.py --config configs/paper_v3_bge_rc_djb.yaml --model-name rc_djb --output-dir data/runs/paper_v3_bge_rc_djb_best --intervention shuffle_event
+```
+
+For the BGE-EJSSM comparison run:
+
+```bash
 uv run python scripts/40_train.py --config configs/paper_v3_bge_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_bge_ejssm_balanced
 uv run python scripts/50_eval.py --config configs/paper_v3_bge_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_bge_ejssm_balanced
 uv run python scripts/50_eval.py --config configs/paper_v3_bge_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_bge_ejssm_balanced --intervention no_jump
@@ -101,10 +112,9 @@ uv run python scripts/50_eval.py --config configs/paper_v3_bge_ejssm.yaml --mode
 ```
 
 The current paper-scale run uses 7,236 real SEC 8-K events, 7,236 matched no-event controls, and
-2,463 held-out rows. The draft reports that BGE-EJSSM improves event-response MSE over the tested
-fusion baselines, improves Gaussian NLL over the hashing EJSSM, and passes no-jump,
-zero-disclosure, and shuffled-disclosure MSE stress tests; it does not claim to solve
-abnormal-return ranking.
+2,463 held-out rows. The draft reports that RC-DJB recovers statistically positive held-out
+abnormal-return rank IC while improving event-response MSE over concat and DOT baselines. It does
+not claim to be a trading system or to dominate every MSE-only ablation.
 
 The current draft lives at `paper/main.tex`, the compiled PDF is `paper/main.pdf`, figures are in
 `paper/figures/`, and table exports are in `paper/tables/`.

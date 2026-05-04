@@ -404,6 +404,141 @@ class EventJumpStateSpaceModel(nn.Module):
         }
 
 
+class DistributionalJumpBridgeModel(nn.Module):
+    """Disclosure-conditioned transport from a no-event distribution to an event distribution.
+
+    EJSSM applies a latent state jump and then predicts a distribution from the jumped state.
+    DJB makes the distributional intervention explicit: the market history first defines a
+    no-event Gaussian forecast, and the disclosure bridge then applies bounded shifts to both the
+    predictive mean and log-variance. This exposes whether text is changing the point forecast,
+    the uncertainty estimate, or both.
+    """
+
+    def __init__(self, config: CEBTConfig) -> None:
+        super().__init__()
+        self.config = config
+        self.jump_uses_metadata = config.jump_uses_metadata
+        self.transport_return_mean = True
+        jump_input_dim = (
+            config.event_embedding_dim + config.metadata_features
+            if self.jump_uses_metadata
+            else config.event_embedding_dim
+        )
+        self.input_projection = nn.Linear(config.price_features, config.hidden_dim)
+        self.encoder = nn.GRU(
+            input_size=config.hidden_dim,
+            hidden_size=config.hidden_dim,
+            num_layers=2,
+            dropout=config.dropout,
+            batch_first=True,
+        )
+        self.metadata_projection = nn.Linear(config.metadata_features, config.hidden_dim)
+        self.base_gate = nn.Sequential(
+            nn.Linear(config.hidden_dim + config.metadata_features, config.hidden_dim),
+            nn.LayerNorm(config.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.hidden_dim, config.hidden_dim),
+            nn.Tanh(),
+        )
+        self.base_distribution = nn.Sequential(
+            nn.LayerNorm(config.hidden_dim + config.metadata_features),
+            nn.Linear(config.hidden_dim + config.metadata_features, config.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.hidden_dim, config.output_dim * 2),
+        )
+        self.bridge_encoder = nn.Sequential(
+            nn.Linear(jump_input_dim, config.hidden_dim),
+            nn.LayerNorm(config.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.hidden_dim, config.hidden_dim),
+            nn.GELU(),
+        )
+        self.state_bridge = nn.Linear(config.hidden_dim, config.hidden_dim * 2)
+        self.distribution_bridge = nn.Sequential(
+            nn.LayerNorm(config.hidden_dim * 2 + config.metadata_features),
+            nn.Linear(config.hidden_dim * 2 + config.metadata_features, config.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.hidden_dim, config.output_dim * 2),
+        )
+        self.bridge_norm = nn.LayerNorm(config.hidden_dim)
+
+    def forward(
+        self,
+        x_pre: torch.Tensor,
+        event_embedding: torch.Tensor,
+        metadata: torch.Tensor,
+        intervention: str = "full",
+    ) -> dict[str, torch.Tensor]:
+        encoded_inputs = self.input_projection(x_pre)
+        _, hidden = self.encoder(encoded_inputs)
+        state = hidden[-1] + self.metadata_projection(metadata)
+        gate = self.base_gate(torch.cat([state, metadata], dim=-1))
+        no_event_state = state * (1.0 + 0.1 * gate)
+        base_params = self.base_distribution(torch.cat([no_event_state, metadata], dim=-1))
+        base_prediction, base_logvar = torch.chunk(base_params, chunks=2, dim=-1)
+        base_logvar = torch.clamp(base_logvar, min=-7.0, max=3.0)
+
+        bridge_input = (
+            torch.cat([event_embedding, metadata], dim=-1)
+            if self.jump_uses_metadata
+            else event_embedding
+        )
+        bridge_hidden = self.bridge_encoder(bridge_input)
+        state_params = self.state_bridge(bridge_hidden)
+        state_direction, state_gate = torch.chunk(state_params, chunks=2, dim=-1)
+        state_jump = (
+            torch.tanh(state_direction) * torch.sigmoid(state_gate) * self.config.jump_scale
+        )
+        if intervention == "no_jump":
+            state_jump = torch.zeros_like(state_jump)
+            bridge_hidden = torch.zeros_like(bridge_hidden)
+        bridged_state = self.bridge_norm(no_event_state + state_jump)
+
+        distribution_delta = self.distribution_bridge(
+            torch.cat([bridged_state, bridge_hidden, metadata], dim=-1)
+        )
+        mean_delta, logvar_delta = torch.chunk(distribution_delta, chunks=2, dim=-1)
+        mean_delta = torch.tanh(mean_delta) * self.config.jump_scale
+        logvar_delta = torch.tanh(logvar_delta) * self.config.jump_scale
+        if not self.transport_return_mean:
+            mean_delta = mean_delta.clone()
+            mean_delta[:, 0] = 0.0
+        if intervention == "no_jump":
+            mean_delta = torch.zeros_like(mean_delta)
+            logvar_delta = torch.zeros_like(logvar_delta)
+        prediction = base_prediction + mean_delta
+        outcome_logvar = torch.clamp(base_logvar + logvar_delta, min=-7.0, max=3.0)
+        return {
+            "prediction": prediction,
+            "base_prediction": base_prediction,
+            "event_delta": mean_delta,
+            "z_event": torch.cat([state_jump, mean_delta, logvar_delta], dim=-1),
+            "mu": state_jump.new_zeros((state_jump.shape[0], 1)),
+            "logvar": state_jump.new_zeros((state_jump.shape[0], 1)),
+            "outcome_logvar": outcome_logvar,
+            "base_logvar": base_logvar,
+            "logvar_delta": logvar_delta,
+            "jump_norm": torch.linalg.vector_norm(state_jump, dim=-1),
+        }
+
+
+class ReturnConservativeDistributionalJumpBridgeModel(DistributionalJumpBridgeModel):
+    """DJB variant that preserves the no-event abnormal-return mean.
+
+    The disclosure bridge may still alter volatility, volume, and all predictive variances, but it
+    cannot directly shift the abnormal-return point forecast. This tests whether disclosure text is
+    more useful as a response-distribution operator than as a cross-sectional return-rank signal.
+    """
+
+    def __init__(self, config: CEBTConfig) -> None:
+        super().__init__(config)
+        self.transport_return_mean = False
+
+
 def build_model(model_name: str, config: CEBTConfig) -> nn.Module:
     if model_name in {"cebt", "cebt_no_controls"}:
         return CounterfactualEventBottleneckTransformer(config)
@@ -417,4 +552,8 @@ def build_model(model_name: str, config: CEBTConfig) -> nn.Module:
         return DisclosureOperatorTransformer(config)
     if model_name in {"ejssm", "event_jump_state_space"}:
         return EventJumpStateSpaceModel(config)
+    if model_name in {"djb", "distributional_jump_bridge"}:
+        return DistributionalJumpBridgeModel(config)
+    if model_name in {"rc_djb", "return_conservative_djb"}:
+        return ReturnConservativeDistributionalJumpBridgeModel(config)
     raise ValueError(f"Unknown model_name: {model_name}")

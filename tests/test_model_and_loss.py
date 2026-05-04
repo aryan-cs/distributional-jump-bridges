@@ -113,6 +113,58 @@ def test_event_jump_no_jump_intervention_zeroes_latent_jump() -> None:
     assert torch.allclose(outputs["jump_norm"], torch.zeros_like(outputs["jump_norm"]))
 
 
+def test_distributional_jump_bridge_forward_shapes_and_intervention() -> None:
+    config = CEBTConfig(
+        price_features=8,
+        metadata_features=6,
+        event_embedding_dim=16,
+        hidden_dim=32,
+        latent_dim=4,
+        jump_scale=0.2,
+        jump_uses_metadata=False,
+    )
+    model = build_model("djb", config)
+    x_pre = torch.randn(4, 5, 8)
+    event_embedding = torch.randn(4, 16)
+    metadata = torch.randn(4, 6)
+    outputs = model(x_pre, event_embedding, metadata)
+    assert outputs["prediction"].shape == (4, 3)
+    assert outputs["event_delta"].shape == (4, 3)
+    assert outputs["outcome_logvar"].shape == (4, 3)
+    assert outputs["base_logvar"].shape == (4, 3)
+    assert outputs["logvar_delta"].shape == (4, 3)
+    assert outputs["z_event"].shape == (4, 38)
+    targets = torch.randn(4, 3)
+    loss, metrics = cebt_loss(
+        outputs, targets, torch.tensor([1.0, 1.0, 0.0, 0.0]), LossWeights(nll_weight=0.1)
+    )
+    assert torch.isfinite(loss)
+    assert metrics["nll"] == float(gaussian_nll_loss(outputs, targets).detach().cpu())
+    no_jump = model(x_pre, event_embedding, metadata, intervention="no_jump")
+    assert torch.allclose(no_jump["event_delta"], torch.zeros_like(no_jump["event_delta"]))
+    assert torch.allclose(no_jump["logvar_delta"], torch.zeros_like(no_jump["logvar_delta"]))
+
+
+def test_return_conservative_djb_preserves_abnormal_return_mean_delta() -> None:
+    config = CEBTConfig(
+        price_features=8,
+        metadata_features=6,
+        event_embedding_dim=16,
+        hidden_dim=32,
+        jump_scale=0.2,
+        jump_uses_metadata=False,
+    )
+    model = build_model("rc_djb", config)
+    outputs = model(
+        torch.randn(4, 5, 8),
+        torch.randn(4, 16),
+        torch.randn(4, 6),
+    )
+    assert torch.allclose(outputs["event_delta"][:, 0], torch.zeros(4))
+    assert torch.allclose(outputs["prediction"][:, 0], outputs["base_prediction"][:, 0])
+    assert torch.any(torch.abs(outputs["event_delta"][:, 1:]) > 0.0)
+
+
 def test_event_jump_can_exclude_control_metadata_from_jump_generator() -> None:
     config = CEBTConfig(
         price_features=8,
