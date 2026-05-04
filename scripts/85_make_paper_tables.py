@@ -1,4 +1,4 @@
-"""Assemble paper tables from the corrected RC-DJB experiment artifacts."""
+"""Assemble paper tables from the corrected DJB/RC-DJB experiment artifacts."""
 
 from __future__ import annotations
 
@@ -37,9 +37,12 @@ RCDJB_INTERVENTIONS = {
     "shuffled_text": "rc_djb_shuffle_event",
 }
 TEMPERATURE_SOURCES = {
-    "T=0.02": Path("data/runs/paper_v3_bge_rc_djb_best/rc_djb_eval_metrics.json"),
-    "T=0.10": Path("data/runs/paper_v3_bge_rc_djb_t010/rc_djb_eval_metrics.json"),
+    ("DJB", "T=0.02"): Path("data/runs/paper_v3_bge_djb_best/djb_eval_metrics.json"),
+    ("DJB", "T=0.10"): Path("data/runs/paper_v3_bge_djb_t010/djb_eval_metrics.json"),
+    ("RC-DJB", "T=0.02"): Path("data/runs/paper_v3_bge_rc_djb_best/rc_djb_eval_metrics.json"),
+    ("RC-DJB", "T=0.10"): Path("data/runs/paper_v3_bge_rc_djb_t010/rc_djb_eval_metrics.json"),
 }
+REFERENCE_MODEL = "djb"
 
 
 def main() -> None:
@@ -69,7 +72,8 @@ def main() -> None:
         PAPER_TABLE_DIR / "tables_summary.json",
         {
             "models": sorted(metrics),
-            "paired_models": sorted(model for model in predictions if model != "rc_djb"),
+            "paired_reference_model": REFERENCE_MODEL,
+            "paired_models": sorted(model for model in predictions if model != REFERENCE_MODEL),
         },
     )
 
@@ -106,12 +110,12 @@ def _flatten_metrics(metrics_by_model: dict[str, dict[str, Any]]) -> list[dict[s
 
 
 def _paired_mse_rows(predictions: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    reference = predictions.get("rc_djb")
+    reference = predictions.get(REFERENCE_MODEL)
     if not reference:
         return []
     rows = []
     for model, candidate in predictions.items():
-        if model == "rc_djb":
+        if model == REFERENCE_MODEL:
             continue
         joined = _join_prediction_rows(reference, candidate)
         if not joined:
@@ -127,7 +131,7 @@ def _paired_mse_rows(predictions: dict[str, list[dict[str, Any]]]) -> list[dict[
         )
         rows.append(
             {
-                "reference_model": "rc_djb",
+                "reference_model": REFERENCE_MODEL,
                 "baseline_model": model,
                 "paired_rows": len(joined),
                 "baseline_minus_reference_mse": interval["mean"],
@@ -140,12 +144,12 @@ def _paired_mse_rows(predictions: dict[str, list[dict[str, Any]]]) -> list[dict[
 
 
 def _paired_rank_rows(predictions: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    reference = predictions.get("rc_djb")
+    reference = predictions.get(REFERENCE_MODEL)
     if not reference:
         return []
     rows = []
     for model, candidate in predictions.items():
-        if model == "rc_djb":
+        if model == REFERENCE_MODEL:
             continue
         joined = _join_prediction_rows(reference, candidate)
         if not joined:
@@ -167,7 +171,7 @@ def _paired_rank_rows(predictions: dict[str, list[dict[str, Any]]]) -> list[dict
         )
         rows.append(
             {
-                "reference_model": "rc_djb",
+                "reference_model": REFERENCE_MODEL,
                 "baseline_model": model,
                 "paired_rows": len(joined),
                 "reference_minus_baseline_rank_ic": interval["mean"],
@@ -264,7 +268,7 @@ def _rc_djb_intervention_paired_rows() -> list[dict[str, Any]]:
 
 def _temperature_sensitivity_rows() -> list[dict[str, Any]]:
     rows = []
-    for label, path in TEMPERATURE_SOURCES.items():
+    for (model, label), path in TEMPERATURE_SOURCES.items():
         if not path.exists():
             continue
         metrics = read_json(path)
@@ -272,6 +276,7 @@ def _temperature_sensitivity_rows() -> list[dict[str, Any]]:
         loto = metrics.get("rank_ic_leave_one_ticker_out", {})
         rows.append(
             {
+                "model": model,
                 "temperature": label,
                 "mse": metrics.get("mse"),
                 "rank_ic": metrics.get("abnormal_return_rank_ic"),

@@ -368,7 +368,7 @@ def make_pareto_frontier(path: Path) -> None:
         ymax=1.00,
         facecolor="#e5f6ef",
         alpha=0.55,
-        label="Low MSE + positive rank region",
+        label="Lower error than concat, positive rank IC",
     )
     for model, x, y, lo_x, hi_x, lo_y, hi_y in zip(
         models, xs, ys, xlos, xhis, ylos, yhis, strict=True
@@ -552,12 +552,6 @@ def make_data_temporal_audit(path: Path) -> None:
             fontsize=8,
             color="#334155",
         )
-    leakage_violations = sum(
-        count
-        for bucket in gap_counts.values()
-        for gap, count in bucket.items()
-        if gap <= 0
-    )
     ax.set_yticks([0, 1], list(y_lookup))
     ax.set_xlim(0.0, 109.0)
     ax.set_ylim(-0.55, 1.45)
@@ -568,12 +562,6 @@ def make_data_temporal_audit(path: Path) -> None:
         loc="left",
         fontsize=10,
         fontweight="semibold",
-    )
-    ax.set_title(
-        f"Leakage violations: {leakage_violations}",
-        loc="right",
-        fontsize=8.6,
-        color="#166534",
     )
     ax.legend(
         handles=[
@@ -743,7 +731,7 @@ def make_rank_decile_ribbons(path: Path) -> None:
         "CEBT": "#d7c5ea",
         "EJSSM-BGE": "#b7d7f2",
         "DJB": "#f7c8a9",
-        "RC-DJB": "#5a9b77",
+        "RC-DJB": "#9fd8cb",
     }
     fig, ax = plt.subplots(figsize=(8.8, 5.0))
     ax.set_facecolor("#fbfdff")
@@ -758,7 +746,7 @@ def make_rank_decile_ribbons(path: Path) -> None:
         scores = np.asarray([row["prediction_abnormal_return"] for row in rows], dtype=float)
         targets = np.asarray([row["target_abnormal_return"] for row in rows], dtype=float)
         means, lows, highs = _decile_bootstrap_profile(scores, targets)
-        is_main = name == "RC-DJB"
+        is_main = name == "DJB"
         ax.plot(
             x,
             means,
@@ -952,7 +940,7 @@ def make_firewall_audit(path: Path) -> None:
     ax.set_yticks(np.arange(len(targets)), [label for _, label in targets])
     ax.invert_yaxis()
     ax.set_xlabel("Mean absolute prediction change from full RC-DJB")
-    ax.set_title("Return firewall audit across interventions", pad=10, fontweight="semibold")
+    ax.set_title("Return-mean firewall audit across interventions", pad=10, fontweight="semibold")
     ax.set_xlim(-0.001, max(stat[4] for stat in stats) * 1.18)
     ax.legend(
         handles=[

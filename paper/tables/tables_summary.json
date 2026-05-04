@@ -1,0 +1,20 @@
+{
+  "models": [
+    "cebt",
+    "concat",
+    "djb",
+    "dot",
+    "ejssm_bge",
+    "no_event",
+    "rc_djb"
+  ],
+  "paired_models": [
+    "cebt",
+    "concat",
+    "dot",
+    "ejssm_bge",
+    "no_event",
+    "rc_djb"
+  ],
+  "paired_reference_model": "djb"
+}

@@ -6,13 +6,13 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{microtype}
+\microtypesetup{expansion=false}
 \usepackage{url}
 \usepackage{hyperref}
 \usepackage{float}
 \usepackage{natbib}
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usepackage{siunitx}
 \usepackage{xcolor}
 \usepackage{needspace}
 \usepackage{placeins}
@@ -33,11 +33,12 @@
     linkcolor=blue!50!black,
     citecolor=blue!50!black,
     urlcolor=blue!50!black,
-    pdftitle={Return-Conservative Distributional Jump Bridges for Financial Disclosure Modeling},
+    hypertexnames=false,
+    pdftitle={Distributional Jump Bridges for Financial Disclosure Response Modeling},
     pdfauthor={Aryan Gupta}
 }
 
-\title{Return-Conservative Distributional Jump Bridges for Financial Disclosure Modeling}
+\title{Distributional Jump Bridges for Financial Disclosure Response Modeling}
 \author{
 Aryan Gupta\\
 \texttt{aryan.cs.app@gmail.com}
@@ -48,23 +49,23 @@ Aryan Gupta\\
 \maketitle
 
 \begin{abstract}
-Financial disclosure models often let event text directly alter every predicted market-response
-target, including abnormal return. This is a flexible design, but it can destroy the weaker
-cross-sectional ranking signal carried by pre-event market state. We propose the
-Return-Conservative Distributional Jump Bridge (RC-DJB), a neural architecture that first estimates
-a no-event response distribution and then lets SEC filing text transport volatility, volume, and
-predictive uncertainty while imposing a hard firewall on the abnormal-return mean. The constraint is
-falsifiable: if disclosure text contains robust near-term return-ranking signal, blocking its direct
-return-mean path should hurt; if not, the bridge should improve event-response modeling without
-overwriting rank information. On a leakage-controlled public-data study with 7,236 SEC 8-K events,
-7,236 matched controls, and 2,463 held-out rows from 98 large U.S. firms, RC-DJB obtains abnormal
-return rank IC 0.0546 with 95\% ticker-clustered interval [0.0104, 0.0948]. It is the only tested
-model that both beats concat fusion on multi-target MSE by a positive paired interval
-(0.0043, [0.0023, 0.0061]) and has a strictly positive ticker-clustered rank-IC interval. Event
-bridge interventions increase held-out event-row MSE by 0.0066, 0.0049, and 0.0081 when the bridge
-is removed, text is zeroed, or text is shuffled. These findings support a return-conservative
-modeling principle for disclosure events: use filing text to transport risk, liquidity, and
-uncertainty responses while preserving abnormal-return ranking in the no-event market state.
+Financial disclosure models often fuse event text with market history and predict every
+market-response target through one shared path. We propose Distributional Jump Bridges (DJB), a
+neural event architecture that first estimates a no-event response distribution from pre-disclosure
+market state, then lets SEC filing text transport the event response through bounded shifts in
+target means and predictive log-variances. A return-conservative variant (RC-DJB) adds a hard
+return-mean firewall, providing a falsifiable test of whether disclosure text should directly move
+near-term abnormal-return point forecasts. On a leakage-controlled public-data study with 7,236 SEC
+8-K events, 7,236 matched controls, and 2,463 held-out rows from 98 large U.S. firms, DJB obtains
+the best corrected multi-target MSE, 0.0552 with 95\% ticker-clustered interval [0.0396, 0.0773],
+and the strongest held-out abnormal-return Rank IC, 0.0330 with ticker-clustered interval
+[-0.0042, 0.0710]. Paired bootstrap comparisons show DJB improves MSE over concat fusion by 0.0114
+[0.0092, 0.0135] and over RC-DJB by 0.0010 [0.0005, 0.0015]. Leave-one-ticker-out Rank IC remains
+positive for every held-out ticker deletion, with minimum 0.0263. RC-DJB bridge interventions raise
+event-row MSE by 0.0183, 0.0037, and 0.0025 when the bridge is removed, text is zeroed, or text is
+shuffled. The results support a response-transport modeling principle: disclosure text is most
+reliable as a distributional bridge for event risk, liquidity, and uncertainty, while return-ranking
+claims should be reported with ticker-clustered and leave-one-ticker stability audits.
 \end{abstract}
 
 \section{Introduction}
@@ -81,24 +82,24 @@ small leakage, data snooping, or backtest overfitting can look like alpha
 \citep{campbell1997econometrics,gu2020empirical,white2000reality,bailey2014probability,
 lopezdeprado2018advances}.
 
-This paper studies a stricter architectural hypothesis. SEC disclosure text should be allowed to
-transport the event-response distribution, but it should not directly overwrite the mean abnormal
-return predicted from the no-event market state. We call the resulting model a
-Return-Conservative Distributional Jump Bridge (RC-DJB). The model first predicts a no-event
-Gaussian response distribution from pre-event price, volume, and market-relative features. It then
-uses disclosure text to generate bounded shifts in volatility-jump mean, volume-jump mean, and
-predictive log-variance. The abnormal-return mean shift is constrained to zero.
+This paper studies a stricter architectural question: should disclosure text enter an event model
+as an unconstrained predictor of every outcome, or as a distributional transport operator layered
+on top of ordinary market dynamics? Distributional Jump Bridges (DJB) first predict a no-event
+Gaussian response distribution from pre-event price, volume, and market-relative features. They
+then use disclosure text to generate bounded shifts in target means and predictive log-variances.
+The return-conservative variant (RC-DJB) adds the sharper restriction
+\(\Delta\mu_{return}=0\), so text may move volatility, volume, and uncertainty but cannot directly
+overwrite the abnormal-return point forecast.
 
 The contributions are:
 \begin{enumerate}
-    \item A return-conservative distributional bridge architecture for event-driven financial
-    modeling.
+    \item A distributional bridge architecture for event-driven financial response modeling.
     \item A leakage-controlled SEC 8-K experiment with matched no-event controls and public
     post-filing market outcomes.
-    \item Evidence that blocking direct text-to-return-mean transport recovers statistically
-    positive rank IC while preserving response-regression gains over fusion baselines.
-    \item Intervention tests showing that the disclosure bridge contributes to event-row MSE even
-    though return ranking is intentionally anchored to the no-event state.
+    \item Corrected event-study target construction that aligns firm and market return windows,
+    plus ticker-clustered and leave-one-ticker stability audits for Rank IC.
+    \item Evidence that DJB improves response-regression error over fusion and bottleneck
+    baselines, with RC-DJB intervention tests isolating what the return-mean firewall changes.
 \end{enumerate}
 
 \section{Related Work}
@@ -131,20 +132,26 @@ Recent financial NLP systems and benchmarks study domain language models, multim
 forecasting, SEC filing reasoning, and leakage in financial agents
 \citep{jegadeesh2013word,araci2019finbert,wu2023bloomberggpt,yang2023fingpt,kong2025timemqa,
 chen2025camef,islam2023financebench,finrate2026,li2025profitmirage}. RC-DJB is also adjacent to
-causal representation and
-counterfactual outcome models \citep{rubin1974estimating,rosenbaum1983central,
-melnychuk2022causaltransformer,feng2024gtransformer}. It differs by imposing a target-specific
-architectural restriction: disclosure text may transport response distribution components, but the
-abnormal-return mean remains no-event anchored.
+causal representation and counterfactual outcome models
+\citep{rubin1974estimating,rosenbaum1983central,melnychuk2022causaltransformer,
+feng2024gtransformer}. DJB differs by routing event text through an explicit residual
+distributional transport module; RC-DJB further imposes a target-specific restriction in which
+disclosure text may transport response distribution components while the abnormal-return mean
+remains no-event anchored.
 
 \section{Method}
+
+We use DJB for the unconstrained distributional bridge and RC-DJB for the return-conservative
+ablation. Both models share the same no-event dynamics and disclosure bridge. DJB allows text to
+shift all three target means; RC-DJB keeps the abnormal-return mean fixed and uses text only for
+volatility, volume, and log-variance transport.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.96\linewidth]{figures/rc_djb_architecture.pdf}
-\caption{RC-DJB first estimates a no-event response distribution from market history. Disclosure
-text generates a bounded bridge for risk/liquidity response and predictive uncertainty, but a
-return-mean firewall enforces \(\Delta \mu_r=0\).}
+\caption{Return-conservative DJB first estimates a no-event response distribution from market
+history. Disclosure text generates a bounded bridge for risk/liquidity response and predictive
+uncertainty, while the firewall variant enforces \(\Delta \mu_r=0\).}
 \label{fig:architecture}
 \end{figure}
 
@@ -152,8 +159,8 @@ return-mean firewall enforces \(\Delta \mu_r=0\).}
 Each sample \(i\) has label start date \(\tau_i\), a 40-trading-day pre-event tensor
 \(X_i \in \mathbb{R}^{40 \times 8}\), disclosure embedding \(e_i\), metadata
 \(m_i \in \mathbb{R}^{6}\), and target vector \(y_i \in \mathbb{R}^{3}\). The targets are
-five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump. The headline
-variant uses chunk-pooled BGE-small disclosure embeddings, following the dense sentence and passage
+five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump. Text-aware
+variants use chunk-pooled BGE-small disclosure embeddings, following the dense sentence and passage
 embedding literature \citep{reimers2019sentence,karpukhin2020dense,xiao2023cpack}.
 
 \Needspace{13\baselineskip}
@@ -213,15 +220,17 @@ Disclosure text generates a bounded latent state jump and distributional transpo
     j_i &= \alpha \tanh(u_\theta(b_i)) \odot \sigma(v_\theta(b_i)),\\
     [\Delta \mu_i, \Delta \ell_i] &= T_\theta(\mathrm{LN}(\tilde{s}_i+j_i), b_i, m_i).
 \end{align}
-Here LN denotes layer normalization \citep{ba2016layer}. The central architectural constraint is
-\(\Delta \mu_{i,return}=0\). Thus,
+Here LN denotes layer normalization \citep{ba2016layer}. The return-conservative architectural
+constraint is \(\Delta \mu_{i,return}=0\). For RC-DJB,
 \begin{align}
     \mu_{1,i} =
     \mu_{0,i} + [0,\Delta\mu_{i,volatility},\Delta\mu_{i,volume}],
     \qquad
     \ell_{1,i} = \mathrm{clip}(\ell_{0,i}+\Delta\ell_i).
 \end{align}
-The model predicts \(p_\theta(y_i)=\mathcal{N}(\mu_{1,i},\mathrm{diag}(\exp(\ell_{1,i})))\).
+DJB removes the zero-return-mean restriction and uses the full
+\(\mu_{1,i}=\mu_{0,i}+\Delta\mu_i\). Both variants predict
+\(p_\theta(y_i)=\mathcal{N}(\mu_{1,i},\mathrm{diag}(\exp(\ell_{1,i})))\).
 
 \Needspace{12\baselineskip}
 \paragraph{Objective.}
@@ -342,10 +351,10 @@ audit.}
 
 Rows with \(\tau_i \leq\) 2023-12-31 are training rows, rows from 2024 are validation rows, and
 later rows are held out. This yields 9,729 training rows, 2,280 validation rows, and 2,463 held-out
-rows across 98 held-out tickers and 13 held-out label-start months. The headline RC-DJB checkpoint
-is selected by validation loss. All models use fixed seed 29 and are evaluated once on the held-out
-split. The chronological split follows time-series evaluation practice, where future observations
-must not influence model selection or feature construction \citep{bergmeir2012use,
+rows across 98 held-out tickers and 13 held-out label-start months. Checkpoints are selected by the
+declared validation criterion for each run and evaluated once on the held-out split. All models use
+fixed seed 29. The chronological split follows time-series evaluation practice, where future
+observations must not influence model selection or feature construction \citep{bergmeir2012use,
 hyndman2021forecasting,lopezdeprado2018advances}.
 
 Baselines include no-event dynamics, text-only MLP, concat fusion, Counterfactual Event Bottleneck
@@ -386,18 +395,18 @@ intervals
 The model-level intervals in Table~\ref{tab:main-results} use \(B=1000\). Ticker-clustered
 intervals sample tickers with replacement and include all held-out rows for each sampled ticker.
 Rank IC uses integer ranks of predicted and realized abnormal returns. Paired MSE comparisons
-against RC-DJB use \(B=2000\) row-paired bootstrap replicates and
+against DJB use \(B=2000\) row-paired bootstrap replicates and
 \begin{equation}
     \Delta_{\operatorname{MSE}}(m)
     = \frac{1}{N}\sum_{i=1}^{N}
     \left[
     \frac{1}{K}\lVert y_i-\hat{y}^{(m)}_i\rVert_2^2
     -
-    \frac{1}{K}\lVert y_i-\hat{y}^{RC}_i\rVert_2^2
+    \frac{1}{K}\lVert y_i-\hat{y}^{DJB}_i\rVert_2^2
     \right],
 \end{equation}
 with rows resampled as matched pairs. Paired rank comparisons use the same joined rows but report
-\(\operatorname{IC}(RC)-\operatorname{IC}(m)\).
+\(\operatorname{IC}(DJB)-\operatorname{IC}(m)\).
 
 \paragraph{Probabilistic diagnostics.}
 For nominal level \(1-\alpha\), the diagonal Gaussian predictive interval for target \(k\) is
@@ -422,40 +431,60 @@ gneiting2007strictly,gneiting2007probabilistic,gneiting2014probabilistic}.
 
 \begin{table}[H]
 \centering
-\caption{Held-out results. MSE is over abnormal return, volatility jump, and volume jump. Intervals
-are 95\% ticker-clustered bootstrap intervals.}
+\caption{Held-out results after corrected firm/market return-window alignment. MSE is over
+abnormal return, volatility jump, and volume jump. Intervals are 95\% ticker-clustered bootstrap
+intervals.}
 \label{tab:main-results}
 \small
 \begin{tabular}{lrlrl}
 \toprule
 Model & MSE & MSE CI & Rank IC & Rank IC CI \\
 \midrule
-No-event & 0.0696 & [0.0519, 0.0936] & -0.0411 & [-0.0840, 0.0016] \\
-Concat fusion & 0.0597 & [0.0442, 0.0817] & -0.0182 & [-0.0597, 0.0267] \\
-CEBT & 0.0660 & [0.0488, 0.0898] & 0.0463 & [0.0052, 0.0893] \\
-DOT & 0.0596 & [0.0449, 0.0804] & -0.0131 & [-0.0510, 0.0291] \\
-EJSSM-BGE & 0.0547 & [0.0395, 0.0764] & 0.0099 & [-0.0329, 0.0556] \\
-DJB & \textbf{0.0539} & [0.0389, 0.0757] & 0.0128 & [-0.0290, 0.0547] \\
-RC-DJB & 0.0554 & [0.0400, 0.0776] & \textbf{0.0546} & [0.0104, 0.0948] \\
+No-event & 0.0695 & [0.0517, 0.0933] & -0.0393 & [-0.0886, 0.0064] \\
+Concat fusion & 0.0666 & [0.0499, 0.0886] & 0.0007 & [-0.0422, 0.0389] \\
+CEBT & 0.0696 & [0.0524, 0.0923] & -0.0295 & [-0.0752, 0.0160] \\
+DOT & 0.0698 & [0.0526, 0.0926] & -0.0043 & [-0.0487, 0.0422] \\
+EJSSM-BGE & 0.0566 & [0.0406, 0.0788] & 0.0254 & [-0.0107, 0.0633] \\
+DJB & \textbf{0.0552} & [0.0396, 0.0773] & \textbf{0.0330} & [-0.0042, 0.0710] \\
+RC-DJB & 0.0562 & [0.0404, 0.0783] & 0.0154 & [-0.0288, 0.0559] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{Paired comparisons against RC-DJB. Positive MSE values mean RC-DJB has lower MSE. Positive
-rank values mean RC-DJB has higher rank IC.}
+\caption{Paired comparisons against DJB. Positive MSE values mean DJB has lower MSE. Positive rank
+values mean DJB has higher rank IC.}
 \label{tab:paired}
 \small
 \begin{tabular}{lrlrl}
 \toprule
 Baseline & MSE Diff. & 95\% CI & Rank IC Diff. & 95\% CI \\
 \midrule
-No-event & 0.01417 & [0.01150, 0.01747] & 0.0956 & [0.0412, 0.1504] \\
-Concat fusion & 0.00427 & [0.00230, 0.00612] & 0.0728 & [0.0197, 0.1249] \\
-CEBT & 0.01057 & [0.00825, 0.01311] & 0.0083 & [-0.0500, 0.0668] \\
-DOT & 0.00418 & [0.00180, 0.00638] & 0.0677 & [0.0186, 0.1180] \\
-EJSSM-BGE & -0.00076 & [-0.00163, 0.00005] & 0.0447 & [-0.0072, 0.0952] \\
+No-event & 0.01424 & [0.01145, 0.01765] & 0.0722 & [0.0204, 0.1293] \\
+Concat fusion & 0.01140 & [0.00919, 0.01353] & 0.0323 & [-0.0214, 0.0875] \\
+CEBT & 0.01443 & [0.01182, 0.01727] & 0.0625 & [0.0144, 0.1151] \\
+DOT & 0.01459 & [0.01200, 0.01735] & 0.0372 & [-0.0257, 0.0993] \\
+EJSSM-BGE & 0.00136 & [0.00085, 0.00188] & 0.0076 & [-0.0192, 0.0370] \\
+RC-DJB & 0.00097 & [0.00052, 0.00146] & 0.0176 & [-0.0174, 0.0557] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Rank-temperature sensitivity. LOTO is the minimum leave-one-ticker-out Rank IC over the
+98 held-out tickers.}
+\label{tab:temperature}
+\small
+\begin{tabular}{llrrrl}
+\toprule
+Model & Temperature & MSE & Rank IC & Rank IC CI & LOTO min \\
+\midrule
+DJB & \(T=0.02\) & 0.0552 & 0.0330 & [-0.0042, 0.0710] & 0.0263 \\
+DJB & \(T=0.10\) & 0.0559 & 0.0152 & [-0.0239, 0.0537] & 0.0086 \\
+RC-DJB & \(T=0.02\) & 0.0562 & 0.0154 & [-0.0288, 0.0559] & 0.0095 \\
+RC-DJB & \(T=0.10\) & 0.0562 & 0.0201 & [-0.0207, 0.0594] & 0.0146 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -474,19 +503,22 @@ average ranks used for tied scores \citep{hanley1982meaning}.
 
 \begin{table}[H]
 \centering
-\caption{RC-DJB diagnostics on the held-out split.}
+\caption{Distributional bridge diagnostics on the held-out split. Log-variance Rank IC audits test
+whether return uncertainty shifts carry signed return-ranking information.}
 \label{tab:diagnostics}
-\begin{tabular}{lr}
+\small
+\begin{tabular}{lrr}
 \toprule
-Diagnostic & Value \\
+Diagnostic & DJB & RC-DJB \\
 \midrule
-Gaussian NLL & -2.2864 \\
-Observed 80\% interval coverage & 0.9011 \\
-Observed 95\% interval coverage & 0.9602 \\
-Mean predictive standard deviation & 0.1302 \\
-Mean response transport, real 8-Ks & 0.0358 \\
-Mean response transport, controls & 0.0073 \\
-Latent bridge AUC, events vs. controls & 0.6038 \\
+Gaussian NLL & -2.2815 & -2.2961 \\
+Observed 80\% interval coverage & 0.8948 & 0.9012 \\
+Observed 95\% interval coverage & 0.9636 & 0.9632 \\
+Mean predictive standard deviation & 0.1351 & 0.1390 \\
+Mean response transport, real 8-Ks & 0.0235 & 0.0832 \\
+Mean response transport, controls & 0.0075 & 0.0684 \\
+Latent bridge AUC, events vs. controls & 0.5297 & 0.6427 \\
+Return log-var delta signed Rank IC & -0.0046 & 0.0274 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -512,10 +544,10 @@ return-mean firewall fixes the abnormal-return point prediction to the no-event 
 \toprule
 Variant & All MSE & Event MSE & Event NLL & Rank IC & Bridge AUC \\
 \midrule
-Full RC-DJB & \textbf{0.0554} & \textbf{0.0843} & \textbf{-2.2115} & 0.0546 & 0.6038 \\
-No bridge & 0.0586 & 0.0909 & -2.1204 & 0.0546 & 0.5000 \\
-Zero text & 0.0578 & 0.0892 & -2.1886 & 0.0546 & 0.4843 \\
-Shuffled text & 0.0597 & 0.0924 & -2.1765 & 0.0546 & 0.5057 \\
+Full RC-DJB & \textbf{0.0562} & \textbf{0.0852} & \textbf{-2.2189} & 0.0154 & 0.6427 \\
+No bridge & 0.0713 & 0.1035 & 4.8117 & 0.0154 & 0.5000 \\
+Zero text & 0.0580 & 0.0889 & -2.2119 & 0.0154 & 0.0067 \\
+Shuffled text & 0.0574 & 0.0877 & -2.2160 & 0.0154 & 0.3554 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -530,9 +562,9 @@ than the intervention.}
 \toprule
 Intervention & Event MSE increase & 95\% paired CI \\
 \midrule
-No bridge & 0.0066 & [0.0043, 0.0093] \\
-Zero text & 0.0049 & [0.0027, 0.0073] \\
-Shuffled text & 0.0081 & [0.0051, 0.0117] \\
+No bridge & 0.0183 & [0.0165, 0.0203] \\
+Zero text & 0.0037 & [0.0025, 0.0051] \\
+Shuffled text & 0.0025 & [0.0014, 0.0036] \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -540,18 +572,19 @@ Shuffled text & 0.0081 & [0.0051, 0.0117] \\
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.96\linewidth]{figures/rc_djb_firewall_audit.pdf}
-\caption{Return firewall audit. Points show mean absolute prediction change from full RC-DJB under
-bridge interventions, with 95\% row-bootstrap intervals. The abnormal-return prediction remains
-exactly invariant while response targets move.}
+\caption{Return-mean firewall audit. Points show mean absolute point-prediction change from full
+RC-DJB under bridge interventions, with 95\% row-bootstrap intervals. The abnormal-return mean
+prediction remains exactly invariant while response targets move; Table~\ref{tab:diagnostics}
+separately audits return log-variance transport.}
 \label{fig:firewall-audit}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.94\linewidth]{figures/rc_djb_pareto_frontier.pdf}
-\caption{RC-DJB occupies a different point on the response/ranking tradeoff: EJSSM and DJB have
-lower point MSE, while RC-DJB is the only tested low-error model with a strictly positive
-ticker-clustered rank-IC interval.}
+\caption{Response/ranking tradeoff after corrected return-window alignment. DJB has the lowest
+held-out MSE and strongest point Rank IC, while ticker-clustered Rank IC intervals remain close to
+zero and require stability auditing.}
 \label{fig:pareto}
 \end{figure}
 
@@ -604,53 +637,59 @@ heterogeneity across firms and calendar months.}
 \centering
 \includegraphics[width=0.94\linewidth]{figures/rc_djb_monthly_rank_heatmap.pdf}
 \caption{Monthly event-rank IC over held-out real 8-K rows. The model-level rank result is not
-uniform across months, but RC-DJB has a more positive held-out pattern than fusion and unconstrained
-event-mean transport baselines.}
+uniform across months, motivating ticker-clustered intervals and leave-one-ticker-out stability
+checks rather than a single unqualified rank statistic.}
 \label{fig:rank-heatmap}
 \end{figure}
 
 \FloatBarrier
 \section{Findings}
 
-\paragraph{Return-mean conservation recovers rank signal.}
-RC-DJB obtains rank IC 0.0546 with ticker-clustered interval [0.0104, 0.0948]. In contrast,
-concat fusion, DOT, EJSSM-BGE, and unconstrained DJB all have rank intervals crossing zero. CEBT
-also has positive rank IC, but its MSE is much worse than RC-DJB. The decile profiles in
-Figure~\ref{fig:rank-deciles} show that this signal is uneven and noisy, rather than a monotone
-large-effect ranking curve.
+\paragraph{Distributional bridging is the main predictive gain.}
+After aligning the firm and market return windows, DJB obtains the best multi-target MSE
+(0.0552) and the strongest point Rank IC (0.0330). Paired comparisons show lower MSE than every
+baseline, including concat fusion by 0.0114 [0.0092, 0.0135], EJSSM-BGE by 0.0014
+[0.0009, 0.0019], and RC-DJB by 0.0010 [0.0005, 0.0015]. The gain is therefore not just a
+different training substrate; it is the learned residual distributional bridge.
 
-\paragraph{The no-event baseline is not the RC-DJB anchor.}
+\paragraph{Return ranking is positive but statistically fragile.}
+DJB's ticker-clustered Rank IC interval is [-0.0042, 0.0710], so the rank result should not be
+reported as cluster-significant. The leave-one-ticker-out audit is still informative: deleting any
+single held-out ticker leaves DJB Rank IC positive, with minimum 0.0263 after removing KLAC and
+maximum 0.0381 after removing COST. Figure~\ref{fig:rank-deciles} shows the same pattern visually:
+the rank profile contains signal, but it is not a monotone large-effect curve.
+
+\paragraph{The no-event baseline is not the DJB anchor.}
 The standalone No-event model has negative held-out rank IC, but this does not imply that
 pre-event market state is intrinsically anti-predictive. That baseline must explain
 disclosure-window returns, volatility, and volume using only ordinary market history and metadata.
-RC-DJB instead trains its no-event state jointly with a disclosure bridge, control penalty,
-likelihood term, and rank objective. The bridge absorbs event-response variation in volatility,
-volume, and uncertainty, while the return-mean firewall prevents high-dimensional text from directly
-rewriting the abnormal-return mean. The empirical claim is therefore not that an isolated no-event
-forecaster is sufficient; it is that a jointly trained no-event return anchor is useful when
-disclosure text is routed through response-distribution transport.
+DJB trains its no-event state jointly with a disclosure bridge, control penalty, likelihood term,
+and rank objective. The empirical claim is therefore not that an isolated no-event forecaster is
+sufficient; it is that no-event dynamics become useful when event text is routed through residual
+response-distribution transport.
 
-\paragraph{The bridge improves response modeling without moving return means.}
-RC-DJB improves paired MSE over concat fusion by 0.0043 and over DOT by 0.0042. Removing the bridge
-raises event-row MSE by 0.0066; zeroing or shuffling text raises event-row MSE by 0.0049 and
-0.0081. These changes occur even though abnormal-return predictions are unchanged by construction,
-which means the bridge is acting through volatility, volume, and uncertainty transport.
-Figures~\ref{fig:bridge-field} and~\ref{fig:bridge-ridges} visualize the same mechanism: disclosure
-text changes response-distribution coordinates while matched controls remain closer to zero
-transport. Figure~\ref{fig:firewall-audit} audits the architectural constraint directly: return
-predictions are invariant under bridge interventions while volatility and volume predictions move.
+\paragraph{The return-mean firewall is a diagnostic constraint.}
+RC-DJB is not the best predictive model after the corrected target; it is a controlled ablation
+that asks what is lost when text is prevented from directly moving abnormal-return means. Its point
+Rank IC is lower than DJB's (0.0154 vs. 0.0330), while its Gaussian NLL is slightly better
+(-2.2961 vs. -2.2815). This tradeoff clarifies the role of the firewall: it isolates risk,
+liquidity, and uncertainty transport from return-mean transport, but the unconstrained bridge is the
+stronger point forecaster in this sample.
 
-\paragraph{There is a real response/ranking tradeoff.}
-EJSSM-BGE and unconstrained DJB achieve lower point MSE than RC-DJB, but their rank IC intervals
-include zero. RC-DJB is therefore not a universal winner; it is a Pareto-frontier point that
-prioritizes statistically reliable ranking while keeping response error below fusion baselines.
-This tradeoff is the main empirical evidence for the return-mean firewall.
+\paragraph{The RC-DJB bridge improves response modeling without moving return means.}
+Removing the RC-DJB bridge raises event-row MSE by 0.0183 [0.0165, 0.0203]; zeroing or shuffling
+text raises event-row MSE by 0.0037 [0.0025, 0.0051] and 0.0025 [0.0014, 0.0036]. These changes
+occur even though abnormal-return point predictions are unchanged by construction, which means the
+bridge is acting through volatility, volume, and uncertainty transport. The return log-variance
+delta has signed Rank IC 0.0274 in RC-DJB, so the paper claims a return-mean firewall rather than
+complete return-distribution isolation.
 
-\paragraph{The likelihood result is competitive but not decisive.}
-RC-DJB has Gaussian NLL -2.2864, close to EJSSM-BGE's -2.2839. The paired NLL difference against
-EJSSM-BGE is small and not statistically decisive. The likelihood evidence supports the bridge as
-competitive; the distinctive result is the combination of positive rank IC and response-error
-improvement over fusion baselines.
+\paragraph{Rank-regularizer sensitivity is bounded.}
+The tighter rank temperature \(T=0.02\) is not the sole source of the rank result. DJB with
+\(T=0.10\) has lower Rank IC (0.0152), but RC-DJB moves from 0.0154 at \(T=0.02\) to 0.0201 at
+\(T=0.10\). In both cases the ticker-clustered intervals cross zero. The appropriate conclusion is
+that the rank regularizer helps shape the ordering objective but does not create a
+cluster-significant trading claim.
 
 \paragraph{The bridge response is heterogeneous.}
 The ticker-month atlas in Figure~\ref{fig:event-atlas} shows that bridge transport is not a uniform
@@ -681,12 +720,14 @@ mean pooling; domain-specific or long-document financial encoders such as FinBER
 BloombergGPT-style models, FinGPT, or SEC-specialized long-context encoders could change absolute
 response error \citep{araci2019finbert,wu2023bloomberggpt,yang2023fingpt}. Because all text-aware
 models in the main experiment share the same frozen text representation, the reported comparison
-isolates the routing architecture rather than encoder scale. Rank IC is statistically positive but
-economically small; net performance after spreads, commissions, market impact, borrow constraints,
-capacity, and turnover requires a separate portfolio-construction study
+isolates the routing architecture rather than encoder scale. Rank IC is positive in point estimate
+and stable under leave-one-ticker deletion, but its ticker-clustered interval crosses zero; net
+performance after spreads, commissions, market impact, borrow constraints, capacity, and turnover
+requires a separate portfolio-construction study
 \citep{grinold2000active,novymarx2016taxonomy,frazzini2018trading,lopezdeprado2018advances}. The
-return-mean firewall is an architectural and predictive constraint, not structural causal identification
-\citep{rubin1974estimating,imbens2015causal}.
+return-mean firewall is an architectural and predictive constraint, not structural causal
+identification \citep{rubin1974estimating,imbens2015causal}; it blocks direct movement of the
+return mean but still allows return log-variance transport.
 
 \section{Ethics and Use}
 
@@ -696,13 +737,13 @@ independent reproduction, and falsification of the empirical claims.
 
 \section{Conclusion}
 
-RC-DJB shows that the route by which disclosure text enters a financial event model matters. Letting
-text directly move the abnormal-return mean is not required for strong response modeling. A
-return-conservative distributional bridge obtains positive held-out rank IC while still improving
-multi-target event-response MSE over concat fusion and DOT. The evidence supports a more precise
-architecture principle for disclosure modeling: use text to
-transport response risk, liquidity, and uncertainty, but keep near-term return ranking anchored to
-the no-event market state unless stronger evidence justifies crossing that boundary.
+DJB shows that the route by which disclosure text enters a financial event model matters.
+Disclosure text is most useful when it acts as a residual distributional transport operator layered
+on top of no-event market dynamics. In the corrected public-data experiment, the unconstrained DJB
+is the strongest response forecaster, while RC-DJB clarifies what changes when a return-mean
+firewall is imposed. The resulting principle is architectural and testable: model disclosures as
+distributional jumps, audit return-ranking claims under ticker-clustered uncertainty, and separate
+return-mean transport from risk, liquidity, and uncertainty transport.
 
 \begingroup
 \footnotesize
