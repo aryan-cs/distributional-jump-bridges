@@ -1185,24 +1185,6 @@ def make_bridge_activation_ladder(path: Path) -> None:
         pad=10,
         fontweight="semibold",
     )
-    ax_transport.annotate(
-        "",
-        xy=(10.0, 0.93),
-        xytext=(1.0, 0.93),
-        xycoords=("data", "axes fraction"),
-        textcoords=("data", "axes fraction"),
-        arrowprops={"arrowstyle": "->", "linewidth": 1.1, "color": "#8091a5"},
-    )
-    ax_transport.text(
-        5.5,
-        0.945,
-        "Weak to strong bridge transport",
-        transform=ax_transport.get_xaxis_transform(),
-        ha="center",
-        va="bottom",
-        fontsize=8,
-        color="#334155",
-    )
     ax_transport.text(
         1.0,
         float(np.mean(vol_means)) * 1.04,
@@ -1264,7 +1246,7 @@ def make_bridge_activation_ladder(path: Path) -> None:
             label=label,
         )
     ax_response.set_ylabel("Mean absolute realized\nresponse, SD units")
-    ax_response.set_xlabel("Bridge response-transport decile")
+    ax_response.set_xlabel("Bridge response-transport decile (weak to strong)")
     ax_response.set_xticks(x, [str(idx) for idx in x])
     ax_response.legend(
         loc="upper center",
