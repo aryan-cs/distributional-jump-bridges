@@ -16,6 +16,7 @@ def parse_args(description: str) -> argparse.Namespace:
     parser.add_argument("--config", default="configs/pilot.yaml")
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--model-name", default="cebt")
+    parser.add_argument("--intervention", default="full")
     return parser.parse_args()
 
 

@@ -14,7 +14,14 @@ def main() -> None:
     feature_path = features / "features.npz"
     metadata_path = features / "features_metadata.jsonl"
     checkpoint_path = run_dir / f"{args.model_name}.pt"
-    metrics = evaluate_model(config, feature_path, metadata_path, checkpoint_path, run_dir)
+    metrics = evaluate_model(
+        config,
+        feature_path,
+        metadata_path,
+        checkpoint_path,
+        run_dir,
+        intervention=args.intervention,
+    )
     print(metrics)
 
 

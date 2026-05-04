@@ -130,6 +130,7 @@ class CounterfactualEventBottleneckTransformer(nn.Module):
         x_pre: torch.Tensor,
         event_embedding: torch.Tensor,
         metadata: torch.Tensor,
+        intervention: str = "full",
     ) -> dict[str, torch.Tensor]:
         base_prediction, no_event_state = self.no_event(x_pre, metadata)
         z_event, mu, logvar = self.event_bottleneck(event_embedding, metadata)
@@ -155,6 +156,7 @@ class NoEventOnlyModel(nn.Module):
         x_pre: torch.Tensor,
         event_embedding: torch.Tensor,
         metadata: torch.Tensor,
+        intervention: str = "full",
     ) -> dict[str, torch.Tensor]:
         prediction, state = self.no_event(x_pre, metadata)
         return {
@@ -182,6 +184,7 @@ class TextOnlyMLP(nn.Module):
         x_pre: torch.Tensor,
         event_embedding: torch.Tensor,
         metadata: torch.Tensor,
+        intervention: str = "full",
     ) -> dict[str, torch.Tensor]:
         prediction = self.net(torch.cat([event_embedding, metadata], dim=-1))
         return {
@@ -366,6 +369,7 @@ class EventJumpStateSpaceModel(nn.Module):
         x_pre: torch.Tensor,
         event_embedding: torch.Tensor,
         metadata: torch.Tensor,
+        intervention: str = "full",
     ) -> dict[str, torch.Tensor]:
         encoded_inputs = self.input_projection(x_pre)
         _, hidden = self.encoder(encoded_inputs)
@@ -382,6 +386,8 @@ class EventJumpStateSpaceModel(nn.Module):
         jump_params = self.jump_generator(jump_input)
         jump_direction, jump_gate = torch.chunk(jump_params, chunks=2, dim=-1)
         jump = torch.tanh(jump_direction) * torch.sigmoid(jump_gate) * self.config.jump_scale
+        if intervention == "no_jump":
+            jump = torch.zeros_like(jump)
         jumped_state = self.jump_norm(no_event_state + jump)
         outcome_input = torch.cat([jumped_state, metadata], dim=-1)
         prediction = self.outcome_head(outcome_input)
