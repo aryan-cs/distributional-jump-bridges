@@ -69,13 +69,17 @@ transport, but directly using it to move the return mean is harmful in this sett
 
 \section{Introduction}
 
-Public disclosures are timed interventions in the market information set. A filing can change
+Public disclosures are timed interventions in the market information set
+\citep{fama1970efficient,beaver1968information,patell1984anticipated}. A filing can change
 volatility, liquidity, and uncertainty even when its effect on cross-sectional abnormal-return
-ranking is weak or unstable. Standard multimodal forecasters typically concatenate price history
-and text embeddings, then predict all targets with a shared head. This design asks the same text
-representation to explain risk response, volume response, uncertainty, and return ranking. In
+ranking is weak or unstable \citep{bamber1986volume,kothari2001capital}. Standard multimodal
+forecasters typically concatenate price history and text embeddings, then predict all targets with a
+shared head \citep{vaswani2017attention,lim2021temporal,chen2025camef}. This design asks the same
+text representation to explain risk response, volume response, uncertainty, and return ranking. In
 financial data, that coupling is a liability: return labels are noisy, text is high dimensional, and
-small leakage or overfitting effects can look like alpha.
+small leakage, data snooping, or backtest overfitting can look like alpha
+\citep{campbell1997econometrics,gu2020empirical,white2000reality,bailey2014probability,
+lopezdeprado2018advances}.
 
 This paper studies a stricter architectural hypothesis. SEC disclosure text should be allowed to
 transport the event-response distribution, but it should not directly overwrite the mean abnormal
@@ -100,23 +104,37 @@ The contributions are:
 \section{Related Work}
 
 Classical event studies estimate abnormal returns around information releases
-\citep{fama1969adjustment,brown1985eventstudies,mackinlay1997eventstudies}. RC-DJB keeps this
-information boundary but replaces scalar event-window estimation with a neural distributional
-response model. The architecture is related to state-space and dynamical-system methods, including
-Koopman operators \citep{koopman1931hamiltonian}, neural differential equations
-\citep{chen2018neuralode}, structured state-space sequence models \citep{gu2022s4}, and selective
-state-space models \citep{gu2023mamba}. Marked point processes model event arrivals
+\citep{fama1969adjustment,brown1985eventstudies,mackinlay1997eventstudies}. Disclosure and
+earnings-announcement studies document price, volatility, and trading-volume responses after public
+information releases \citep{beaver1968information,patell1984anticipated,bamber1986volume,
+boehmer1991event,kothari2007econometrics}. RC-DJB keeps this information boundary but replaces
+scalar event-window estimation with a neural distributional response model. The abnormal-return
+construction follows the market-model and factor-model tradition
+\citep{sharpe1964capital,fama1993common,carhart1997persistence,kothari2007econometrics}; this
+study uses a SPY-adjusted public-data variant rather than CRSP/factor residuals.
+
+The architecture is related to recurrent, state-space, and dynamical-system methods, including
+LSTMs and gated recurrent units \citep{hochreiter1997long,cho2014learning}, Koopman operators
+\citep{koopman1931hamiltonian}, neural differential equations \citep{chen2018neuralode},
+structured state-space sequence models \citep{gu2022s4}, and selective state-space models
+\citep{gu2023mamba}. It also draws on probabilistic forecasting and time-series foundation model
+work \citep{dawid1984prequential,gneiting2007strictly,salinas2020deepar,lim2021temporal,
+nie2023patchtst,wu2023timesnet,ansari2024chronos,wu2024moment,jin2023timellm}. Marked point
+processes model event arrivals
 \citep{hawkes1971spectra,mei2017neuralhawkes}; here the disclosure time is observed and the task is
 post-event response prediction.
 
 Financial text contains information relevant to prices and fundamentals
-\citep{loughran2011liability,cohen2020lazy,araci2019finbert}. Recent work studies multimodal
-financial forecasting, financial reasoning benchmarks, and leakage in financial agents
-\citep{chen2025camef,islam2023financebench,finrate2026,li2025profitmirage}. Causal Transformer and
-G-Transformer estimate counterfactual outcomes in temporal settings
-\citep{melnychuk2022causaltransformer,feng2024gtransformer}. RC-DJB differs by imposing a
-target-specific architectural restriction: disclosure text may transport response distribution
-components, but the abnormal-return mean remains no-event anchored.
+\citep{tetlock2007giving,tetlock2008more,kogan2009predicting,loughran2011liability,cohen2020lazy}.
+Recent financial NLP systems and benchmarks study domain language models, multimodal financial
+forecasting, SEC filing reasoning, and leakage in financial agents
+\citep{jegadeesh2013word,araci2019finbert,wu2023bloomberggpt,yang2023fingpt,chen2025camef,
+islam2023financebench,finrate2026,li2025profitmirage}. RC-DJB is also adjacent to causal
+representation and
+counterfactual outcome models \citep{rubin1974estimating,rosenbaum1983central,
+melnychuk2022causaltransformer,feng2024gtransformer}. It differs by imposing a target-specific
+architectural restriction: disclosure text may transport response distribution components, but the
+abnormal-return mean remains no-event anchored.
 
 \section{Method}
 
@@ -134,7 +152,8 @@ Each sample \(i\) has label start date \(\tau_i\), a 40-trading-day pre-event te
 \(X_i \in \mathbb{R}^{40 \times 8}\), disclosure embedding \(e_i\), metadata
 \(m_i \in \mathbb{R}^{6}\), and target vector \(y_i \in \mathbb{R}^{3}\). The targets are
 five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump. The headline
-variant uses chunk-pooled BGE-small disclosure embeddings \citep{xiao2023cpack}.
+variant uses chunk-pooled BGE-small disclosure embeddings, following the dense sentence and passage
+embedding literature \citep{reimers2019sentence,karpukhin2020dense,xiao2023cpack}.
 
 \Needspace{13\baselineskip}
 \paragraph{Event-study labels.}
@@ -143,7 +162,12 @@ for firm \(i\), and let \(r^M_t\) denote the SPY return. The label window
 \(\mathcal{W}_i=\{\tau_i,\ldots,\eta_i\}\) starts on the disclosure date for before-close traded-day
 filings and on the next traded date otherwise; \(\eta_i\) is the fifth tradable session in the
 window. The pre-window
-\(\mathcal{P}_i\) is the 20 traded sessions strictly before \(\tau_i\). The implemented targets are
+\(\mathcal{P}_i\) is the 20 traded sessions strictly before \(\tau_i\). These choices follow the
+event-study convention that features must precede the public event time while outcomes are measured
+only after the event window begins \citep{brown1985eventstudies,mackinlay1997eventstudies,
+patell1984anticipated,boehmer1991event}. Realized-volatility differences are reported as a simple
+daily-data analogue of the realized-variation literature \citep{andersen2003modeling}. The
+implemented targets are
 \begin{align}
     y_{i,r}
     &= \frac{P_{i,\eta_i}}{P_{i,\tau_i}} - 1
@@ -159,12 +183,13 @@ Rows are admissible only when their maximum feature date is strictly before the 
 \(\max\{t:t\in X_i\}<\tau_i\).
 
 \paragraph{No-event distribution.}
-A recurrent encoder maps pre-event market history to a latent state:
+A recurrent encoder maps pre-event market history to a latent state \citep{cho2014learning}:
 \begin{equation}
     h_i = \mathrm{GRU}_\theta(X_i) + W_m m_i .
 \end{equation}
 A bounded gate produces the no-event state \(\tilde{s}_i\), from which the model predicts a
-diagonal Gaussian distribution:
+diagonal Gaussian distribution, a standard proper-scoring-rule choice for probabilistic forecasts
+\citep{gneiting2007strictly,salinas2020deepar}:
 \begin{align}
     \tilde{s}_i &= h_i \odot (1 + 0.1 \tanh(g_\theta(h_i,m_i))),\\
     [\mu_{0,i}, \ell_{0,i}] &= f_\theta(\tilde{s}_i,m_i),
@@ -178,7 +203,8 @@ Disclosure text generates a bounded latent state jump and distributional transpo
     j_i &= \alpha \tanh(u_\theta(b_i)) \odot \sigma(v_\theta(b_i)),\\
     [\Delta \mu_i, \Delta \ell_i] &= T_\theta(\mathrm{LN}(\tilde{s}_i+j_i), b_i, m_i).
 \end{align}
-The central architectural constraint is \(\Delta \mu_{i,return}=0\). Thus,
+Here LN denotes layer normalization \citep{ba2016layer}. The central architectural constraint is
+\(\Delta \mu_{i,return}=0\). Thus,
 \begin{align}
     \mu_{1,i} =
     \mu_{0,i} + [0,\Delta\mu_{i,volatility},\Delta\mu_{i,volume}],
@@ -190,14 +216,15 @@ The model predicts \(p_\theta(y_i)=\mathcal{N}(\mu_{1,i},\mathrm{diag}(\exp(\ell
 \Needspace{12\baselineskip}
 \paragraph{Objective.}
 For target dimension \(k\), the Gaussian negative log likelihood used for probabilistic training
-and evaluation is
+and evaluation is a proper likelihood-based scoring objective \citep{gneiting2007strictly}:
 \begin{equation}
     \mathcal{L}_{NLL}
     = \frac{1}{2NK}\sum_{i=1}^{N}\sum_{k=1}^{K}
     \left[\exp(-\ell_{1,ik})(y_{ik}-\mu_{1,ik})^2+\ell_{1,ik}\right],
     \qquad K=3,\quad \ell_{1,ik}\in[-7,3].
 \end{equation}
-The pairwise rank regularizer is computed only over real-disclosure pairs in a minibatch:
+The pairwise rank regularizer is computed only over real-disclosure pairs in a minibatch, following
+pairwise learning-to-rank objectives \citep{burges2005learning,cao2007learning}:
 \begin{equation}
     \mathcal{L}_{rank}
     = \frac{1}{|\mathcal{Q}|}\sum_{(i,j)\in\mathcal{Q}}
@@ -207,7 +234,8 @@ The pairwise rank regularizer is computed only over real-disclosure pairs in a m
     \right]\right),
 \end{equation}
 where \(\mathcal{Q}\) contains event pairs with unequal abnormal-return labels and \(T=0.02\).
-The supervised term is the weighted Smooth-L1 loss after optional target standardization:
+The supervised term is the weighted Smooth-L1 loss after optional target standardization
+\citep{huber1964robust}:
 \begin{equation}
     \mathcal{L}_{Huber}
     =
@@ -216,7 +244,9 @@ The supervised term is the weighted Smooth-L1 loss after optional target standar
     \left(\frac{\mu_{1,ik}-\bar{y}_k}{s_k},
     \frac{y_{ik}-\bar{y}_k}{s_k}\right).
 \end{equation}
-For bottleneck models with posterior parameters \((\mu^z_i,\ell^z_i)\),
+For bottleneck models with posterior parameters \((\mu^z_i,\ell^z_i)\), the KL penalty follows
+variational and information-bottleneck regularization \citep{kingma2013autoencoding,
+tishby2000information},
 \begin{equation}
     \mathcal{L}_{KL}
     = -\frac{1}{2}\operatorname{mean}_{i,k}
@@ -255,7 +285,8 @@ firms, SEC 8-K filings from 2020--2025, and public daily prices. Tickers are map
 the SEC company-tickers file. Filings are read from SEC submissions JSON, including archived
 submissions, using \texttt{acceptanceDateTime} and the primary EDGAR document URL. The parser stores
 source URL, accession number, accepted timestamp, available timestamp, extracted text, and text
-hash.
+hash. Prior filing-text studies motivate using public SEC text as a market-response substrate
+\citep{loughran2011liability,jegadeesh2013word,cohen2020lazy}.
 
 Daily prices are downloaded from public price endpoints, with SPY used as the market proxy for
 abnormal returns. The trading calendar is inferred from observed price rows. Event label windows
@@ -263,7 +294,10 @@ start on the same observed trading day for filings accepted before 16:00 ET; fil
 16:00 ET or on non-trading days start on the next observed trading day. Features use only prices
 strictly before the label start date. Labels use future returns only as targets. One deterministic
 same-ticker no-event control is constructed for each filing, excluding dates within a 10-calendar-day
-blackout window around known events.
+blackout window around known events. The no-lookahead rule and blackout controls are motivated by
+standard event-study design and known financial backtesting leakage failure modes
+\citep{mackinlay1997eventstudies,white2000reality,hansen2005spa,bailey2014probability,
+lopezdeprado2018advances,li2025profitmirage}.
 
 \begin{table}[H]
 \centering
@@ -289,14 +323,18 @@ Rows with \(\tau_i \leq\) 2023-12-31 are training rows, rows from 2024 are valid
 later rows are held out. This yields 9,729 training rows, 2,280 validation rows, and 2,463 held-out
 rows across 98 held-out tickers and 13 held-out label-start months. The headline RC-DJB checkpoint
 is selected by validation loss. All models use fixed seed 29 and are evaluated once on the held-out
-split.
+split. The chronological split follows time-series evaluation practice, where future observations
+must not influence model selection or feature construction \citep{bergmeir2012use,
+hyndman2021forecasting,lopezdeprado2018advances}.
 
 Baselines include no-event dynamics, text-only MLP, concat fusion, Counterfactual Event Bottleneck
 Transformer (CEBT), Disclosure Operator Transformer (DOT), Event-Jump State Space Model (EJSSM),
 and an unconstrained Distributional Jump Bridge (DJB). Confidence intervals use percentile
-bootstrap resampling; ticker-clustered intervals resample tickers with replacement. Paired
-comparisons use row-paired bootstrap resampling. Rank IC is Spearman correlation between predicted
-and realized abnormal return.
+bootstrap resampling; ticker-clustered intervals resample tickers with replacement
+\citep{efron1979bootstrap,efron1993introduction,davison1997bootstrap,cameron2008bootstrap,
+cameron2015practitioner}. Paired comparisons use row-paired bootstrap resampling. Rank IC is
+Spearman correlation between predicted and realized abnormal return
+\citep{spearman1904proof,grinold2000active}.
 
 \Needspace{15\baselineskip}
 \paragraph{Evaluation statistics.}
@@ -355,7 +393,9 @@ and empirical coverage is
     \mathbb{1}\{y_{ik}\in I_{ik}(1-\alpha)\}.
 \end{equation}
 Mean predictive standard deviation is
-\(\frac{1}{NK}\sum_{i,k}\exp(\ell_{1,ik}/2)\).
+\(\frac{1}{NK}\sum_{i,k}\exp(\ell_{1,ik}/2)\). Interval coverage is reported because calibrated
+predictive uncertainty is distinct from point forecast error \citep{winkler1972score,
+gneiting2007strictly,gneiting2007probabilistic,gneiting2014probabilistic}.
 
 \begin{table}[H]
 \centering
@@ -407,7 +447,7 @@ The response-transport statistic for group \(c\in\{0,1\}\) is
 \end{equation}
 where \(c=1\) denotes real 8-K rows and \(c=0\) denotes controls. Latent bridge AUC uses the score
 \(s_i=\operatorname{mean}_k|z_{i,k}|\) to classify real disclosures against matched controls, with
-average ranks used for tied scores.
+average ranks used for tied scores \citep{hanley1982meaning}.
 
 \begin{table}[H]
 \centering
@@ -435,7 +475,9 @@ jump, bridge hidden state, mean delta, and log-variance delta to zero, so \(\mu_
 \(\ell_1=\ell_0\). The zero-text intervention replaces \(e_i\) with the zero vector before the
 forward pass. The shuffled-text intervention applies one deterministic held-out permutation of
 disclosure embeddings. For RC-DJB, \(\Delta\mu_{return}=0\) in every variant, so abnormal-return
-point predictions and rank IC are invariant to these bridge interventions.
+point predictions and rank IC are invariant to these bridge interventions. These ablations are
+intervention-style tests of a learned component rather than causal identification of market effects
+\citep{rubin1974estimating,imbens2015causal}.
 
 \begin{table}[H]
 \centering
@@ -539,11 +581,14 @@ included in model inputs.
 The study has several limitations. The universe is large-cap biased and may contain survivorship
 effects, ticker-history issues, and 8-K item-mix sensitivity. The price source is public daily data
 rather than CRSP or intraday trades and quotes. Abnormal returns are SPY-adjusted rather than
-factor-model residuals. BGE-small is a general-purpose encoder, and filings are represented by
+factor-model residuals \citep{fama1993common,carhart1997persistence}. BGE-small is a
+general-purpose encoder, and filings are represented by
 chunk mean pooling rather than a trained long-document financial encoder. Rank IC is statistically
 positive but economically small; transaction costs, capacity, and portfolio construction are outside
-the scope of this study. The return firewall is an architectural and predictive constraint, not
-structural causal identification.
+the scope of this study \citep{grinold2000active,novymarx2016taxonomy,frazzini2018trading,
+lopezdeprado2018advances}. The return firewall is an architectural and predictive constraint, not
+structural causal identification
+\citep{rubin1974estimating,imbens2015causal}.
 
 \section{Ethics and Use}
 
