@@ -1,6 +1,6 @@
 # arXiv Submission Metadata
 
-Title: DJB: Distributional Jump Bridges for Disclosure Response Forecasts
+Title: Distributional Jump Bridges for Disclosure Response Forecasts
 
 Author: Aryan Gupta
 

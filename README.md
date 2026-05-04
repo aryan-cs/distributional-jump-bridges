@@ -1,4 +1,4 @@
-# DJB: Distributional Jump Bridges for Disclosure Response Forecasts
+# Distributional Jump Bridges for Disclosure Response Forecasts
 
 This repository studies event-driven financial modeling as a latent distribution-transport problem.
 The current paper centers on **Distributional Jump Bridges (DJB)** and analyzes a

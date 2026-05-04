@@ -2,7 +2,7 @@
 
 ## Title
 
-DJB: Distributional Jump Bridges for Disclosure Response Forecasts
+Distributional Jump Bridges for Disclosure Response Forecasts
 
 ## Thesis
 
