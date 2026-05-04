@@ -42,13 +42,14 @@ market dynamics. We propose the Event-Jump State Space Model (EJSSM), a neural a
 separates ordinary no-event evolution from disclosure-induced latent jumps. A recurrent state
 encoder summarizes pre-event price and volume history, a no-event transition estimates the
 ordinary continuation, and SEC filing text generates a bounded latent jump before a Gaussian
-event-response head predicts abnormal return, volatility jump, and volume jump. On a
-leakage-controlled public-data study with 7,236 SEC 8-K events, 7,236 matched no-event controls,
+event-response head predicts abnormal return, volatility jump, and volume jump. In the main
+variant, the jump generator receives disclosure text but not event/control indicator metadata. On
+a leakage-controlled public-data study with 7,236 SEC 8-K events, 7,236 matched no-event controls,
 and 2,463 held-out rows from 98 large U.S. firms, EJSSM reduces held-out multi-target MSE from
-0.0597 for concat fusion to 0.0525. The paired row-bootstrap improvement over concat fusion is
-0.0072 with 95\% interval [0.0042, 0.0106]. EJSSM also produces near-nominal 95\% Gaussian
-coverage (0.946 observed) and separates real disclosures from matched controls in latent jump
-magnitude (0.0837 vs. 0.0362). The architecture does not improve abnormal-return rank IC; its
+0.0597 for concat fusion to 0.0551. The paired row-bootstrap improvement over concat fusion is
+0.0046 with 95\% interval [0.0018, 0.0078]. EJSSM also produces near-nominal 95\% Gaussian
+coverage (0.947 observed) and separates real disclosures from matched controls in latent jump
+magnitude (0.0887 vs. 0.0513). The architecture does not improve abnormal-return rank IC; its
 contribution is calibrated event-response modeling, not trading-signal ranking.
 \end{abstract}
 
@@ -68,9 +69,10 @@ event-specific latent mechanism.
 
 We introduce the Event-Jump State Space Model (EJSSM). Given a pre-event market window \(X_i\),
 metadata \(m_i\), and disclosure embedding \(e_i\), EJSSM first estimates a no-event latent state
-\(\tilde{s}_i\). It then maps the disclosure to a bounded jump \(j_i\) and predicts the event
-response from \(s_i^+ = \mathrm{LN}(\tilde{s}_i + j_i)\). Matched no-event controls penalize
-spurious event deltas on dates where no disclosure is present.
+\(\tilde{s}_i\). It then maps disclosure text to a bounded jump \(j_i\) and predicts the event
+response from \(s_i^+ = \mathrm{LN}(\tilde{s}_i + j_i)\). The jump generator excludes
+event/control indicator metadata; matched no-event controls penalize spurious event deltas on dates
+where no disclosure is present.
 
 The contributions are:
 \begin{enumerate}
@@ -134,9 +136,9 @@ A bounded no-event gate produces the ordinary continuation:
 The base head \(b_\theta(\tilde{s}_i)\) estimates the response expected without an event jump.
 
 \paragraph{Disclosure jump.}
-The disclosure encoder generates a jump direction and gate:
+The disclosure encoder generates a jump direction and gate from text alone:
 \begin{align}
-    [u_i, v_i] &= r_\theta(e_i, m_i),\\
+    [u_i, v_i] &= r_\theta(e_i),\\
     j_i &= \alpha \tanh(u_i) \odot \sigma(v_i),
 \end{align}
 where \(\alpha=0.20\) in the main experiment. The event state is
@@ -239,7 +241,7 @@ Text-only & 0.0643 & [0.0495, 0.0844] & -0.0009 & [-0.0456, 0.0434] \\
 Concat fusion & 0.0597 & [0.0442, 0.0817] & -0.0182 & [-0.0597, 0.0267] \\
 CEBT & 0.0660 & [0.0488, 0.0898] & \textbf{0.0463} & [0.0052, 0.0893] \\
 DOT & 0.0596 & [0.0449, 0.0804] & -0.0131 & [-0.0510, 0.0291] \\
-EJSSM & \textbf{0.0525} & [0.0390, 0.0729] & -0.0096 & [-0.0487, 0.0302] \\
+EJSSM & \textbf{0.0551} & [0.0412, 0.0748] & 0.0027 & [-0.0410, 0.0431] \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -252,11 +254,11 @@ EJSSM & \textbf{0.0525} & [0.0390, 0.0729] & -0.0096 & [-0.0487, 0.0302] \\
 \toprule
 Baseline & Baseline--EJSSM MSE & 95\% paired CI \\
 \midrule
-No-event & 0.01710 & [0.01236, 0.02279] \\
-Text-only & 0.01180 & [0.00890, 0.01489] \\
-Concat fusion & 0.00720 & [0.00417, 0.01057] \\
-CEBT & 0.01351 & [0.00932, 0.01837] \\
-DOT & 0.00711 & [0.00443, 0.01000] \\
+No-event & 0.01449 & [0.00981, 0.01990] \\
+Text-only & 0.00919 & [0.00614, 0.01239] \\
+Concat fusion & 0.00460 & [0.00180, 0.00775] \\
+CEBT & 0.01090 & [0.00713, 0.01528] \\
+DOT & 0.00450 & [0.00191, 0.00724] \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -269,14 +271,14 @@ DOT & 0.00711 & [0.00443, 0.01000] \\
 \toprule
 Diagnostic & Value \\
 \midrule
-Gaussian NLL & -2.2250 \\
-Observed 80\% interval coverage & 0.8582 \\
-Observed 95\% interval coverage & 0.9456 \\
-Mean predictive standard deviation & 0.1064 \\
-Mean latent jump, real 8-Ks & 0.0837 \\
-Mean latent jump, controls & 0.0362 \\
-Mean event delta, real 8-Ks & 0.0443 \\
-Mean event delta, controls & 0.0132 \\
+Gaussian NLL & -2.2130 \\
+Observed 80\% interval coverage & 0.8586 \\
+Observed 95\% interval coverage & 0.9475 \\
+Mean predictive standard deviation & 0.1117 \\
+Mean latent jump, real 8-Ks & 0.0887 \\
+Mean latent jump, controls & 0.0513 \\
+Mean event delta, real 8-Ks & 0.0578 \\
+Mean event delta, controls & 0.0277 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -317,25 +319,25 @@ realized-return dispersion, which explains the weak rank-IC result.}
 \section{Findings}
 
 \paragraph{Latent jumps improve event-response regression.}
-EJSSM has held-out MSE 0.0525, compared with 0.0597 for concat fusion and 0.0596 for DOT. The
-paired MSE improvement over concat fusion is 0.0072 with interval [0.0042, 0.0106], and the
-improvement over DOT is 0.0071 with interval [0.0044, 0.0100]. The event-only MSE is also lower:
-0.0781 for EJSSM versus 0.0907 for concat fusion on held-out real 8-K rows.
+EJSSM has held-out MSE 0.0551, compared with 0.0597 for concat fusion and 0.0596 for DOT. The
+paired MSE improvement over concat fusion is 0.0046 with interval [0.0018, 0.0078], and the
+improvement over DOT is 0.0045 with interval [0.0019, 0.0072]. The event-only MSE is also lower:
+0.0825 for EJSSM versus 0.0907 for concat fusion on held-out real 8-K rows.
 
 \paragraph{The learned jump channel is active on real disclosures.}
-Mean absolute latent jump magnitude is 0.0837 for real 8-K rows and 0.0362 for matched no-event
-controls. Mean absolute event delta is 0.0443 for real 8-K rows and 0.0132 for controls. These
+Mean absolute latent jump magnitude is 0.0887 for real 8-K rows and 0.0513 for matched no-event
+controls. Mean absolute event delta is 0.0578 for real 8-K rows and 0.0277 for controls. These
 gaps support the interpretation that the model uses its jump channel differently when a public
 filing is present.
 
 \paragraph{The probabilistic head is useful but imperfect.}
-The 95\% Gaussian interval has observed coverage 0.9456, close to nominal. The 80\% interval has
-coverage 0.8582, indicating conservative uncertainty at narrower intervals. This suggests that
+The 95\% Gaussian interval has observed coverage 0.9475, close to nominal. The 80\% interval has
+coverage 0.8586, indicating conservative uncertainty at narrower intervals. This suggests that
 the model captures broad event-response dispersion better than fine-grained conditional variance.
 
 \paragraph{EJSSM does not solve event ranking.}
-The abnormal-return rank IC for EJSSM is -0.0096 with ticker-clustered interval
-[-0.0487, 0.0302]. CEBT remains the only tested model with positive clustered rank-IC interval.
+The abnormal-return rank IC for EJSSM is 0.0027 with ticker-clustered interval
+[-0.0410, 0.0431]. CEBT remains the only tested model with positive clustered rank-IC interval.
 Thus, the main EJSSM result is calibrated response regression and latent jump separation, not
 cross-sectional return ranking.
 
@@ -352,9 +354,10 @@ inputs.
 \section{Limitations}
 
 The study has several limitations. The disclosure encoder is a deterministic hashing baseline
-rather than a pretrained financial language model. Controls use zero event embeddings and explicit
-control metadata, so stronger placebo-text controls remain necessary. The price source is public
-daily data rather than CRSP or intraday trades and quotes. The universe is large-cap biased and may
+rather than a pretrained financial language model. The jump generator excludes event/control
+metadata, but controls still use zero event embeddings, so stronger placebo-text controls remain
+necessary. The price source is public daily data rather than CRSP or intraday trades and quotes.
+The universe is large-cap biased and may
 contain survivorship effects, ticker-history issues, and 8-K item-mix sensitivity. Abnormal returns
 are SPY-adjusted rather than factor-model residuals. EJSSM improves event-response MSE but does not
 produce a statistically reliable abnormal-return ranking signal. The jump interpretation is
