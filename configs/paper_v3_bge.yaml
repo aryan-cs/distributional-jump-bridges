@@ -1,0 +1,70 @@
+project:
+  name: cebt
+  run_name: paper_v3_bge
+seed: 29
+
+data:
+  tickers: [
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL",
+    "META", "JPM", "XOM", "V", "MA",
+    "COST", "HD", "PG", "NFLX", "JNJ",
+    "BAC", "ABBV", "KO", "CRM", "AMD",
+    "PEP", "WMT", "ORCL", "MRK", "CVX",
+    "CSCO", "ACN", "MCD", "ADBE", "IBM",
+    "GE", "TMO", "LIN", "ABT", "DIS",
+    "QCOM", "CAT", "NOW", "INTU", "AMAT",
+    "VZ", "TXN", "PM", "ISRG", "BKNG",
+    "SPGI", "UNH", "LLY", "AVGO", "TGT",
+    "LOW", "RTX", "HON", "NEE", "UPS",
+    "MS", "GS", "BLK", "AXP", "SCHW",
+    "DE", "MDT", "SYK", "TJX", "GILD",
+    "C", "AMGN", "PFE", "COP", "BA",
+    "PLD", "CB", "MMC", "LMT", "ADP",
+    "ETN", "VRTX", "REGN", "ADI", "MU",
+    "LRCX", "KLAC", "PANW", "SNPS", "CDNS",
+    "SO", "DUK", "SBUX", "NKE", "CMG",
+    "ELV", "CI", "MDLZ", "MO", "CL",
+    "SHW", "APD", "EOG", "SLB", "USB"
+  ]
+  start_date: "2020-01-01"
+  end_date: "2025-12-31"
+  forms: ["8-K"]
+  max_events_per_company: 120
+  pre_window: 40
+  horizon: 5
+  control_blackout_days: 10
+  controls_per_event: 1
+
+sec:
+  base_url: "https://data.sec.gov"
+  archives_url: "https://www.sec.gov/Archives/edgar/data"
+  ticker_url: "https://www.sec.gov/files/company_tickers.json"
+  max_requests_per_second: 8
+  user_agent_env: "SEC_USER_AGENT"
+
+prices:
+  provider: "auto"
+  market_ticker: "SPY"
+
+features:
+  embedding:
+    provider: "sentence_transformers"
+    model_id: "BAAI/bge-small-en-v1.5"
+    dim: 384
+    batch_size: 16
+    max_chunk_words: 220
+    max_chunks: 12
+  metadata_dim: 6
+
+model:
+  config_path: "configs/model/ejssm_bge_small.yaml"
+
+training:
+  epochs: 18
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  amp: true
+  split:
+    train_until: "2023-12-31"
+    val_until: "2024-12-31"

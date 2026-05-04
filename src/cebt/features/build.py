@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 
 from cebt.data.prices import PriceBar, close_returns
-from cebt.features.embeddings import HashingEmbedder, embed_texts_with_cache, zero_embedding
+from cebt.features.embeddings import build_embedder, embed_texts_with_cache, zero_embedding
 from cebt.utils.hashing import stable_id
 from cebt.utils.io import write_json, write_jsonl
 from cebt.utils.time import TradingCalendar, parse_date
@@ -58,10 +58,8 @@ def build_feature_bundle(
     horizon = int(data_config.get("horizon", 5))
     blackout = int(data_config.get("control_blackout_days", 10))
     controls_per_event = int(data_config.get("controls_per_event", 1))
-    embedding_dim = int(embedding_config.get("dim", 256))
-    embedder = HashingEmbedder(
-        dim=embedding_dim, model_id=embedding_config.get("model_id", "cebt.hashing-v1")
-    )
+    embedder = build_embedder(embedding_config)
+    embedding_dim = int(embedder.dim)
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -181,6 +179,9 @@ def build_feature_bundle(
             "horizon": horizon,
             "price_features": PRICE_FEATURES,
             "metadata_features": METADATA_FEATURES,
+            "embedding_provider": embedding_config.get("provider", "hashing"),
+            "embedding_model_id": embedder.model_id,
+            "embedding_dim": embedding_dim,
         },
     )
     return bundle
