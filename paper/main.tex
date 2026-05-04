@@ -119,30 +119,23 @@ construction follows the market-model and factor-model tradition
 \citep{sharpe1964capital,fama1993common,carhart1997persistence,kothari2007econometrics}; this
 study uses a SPY-adjusted public-data variant rather than CRSP/factor residuals.
 
-The architecture is related to recurrent, state-space, and dynamical-system methods, including
-LSTMs and gated recurrent units \citep{hochreiter1997long,cho2014learning}, Koopman operators
-\citep{koopman1931hamiltonian}, neural differential equations \citep{chen2018neuralode},
-structured state-space sequence models \citep{gu2022s4}, and selective state-space models
-\citep{gu2023mamba,wang2025ssmbottleneck}. It also draws on probabilistic forecasting and
-time-series foundation model work \citep{dawid1984prequential,gneiting2007strictly,
-salinas2020deepar,lim2021temporal,
-nie2023patchtst,wu2023timesnet,ansari2024chronos,wu2024moment,jin2023timellm}. Marked point
-processes model event arrivals
-\citep{hawkes1971spectra,mei2017neuralhawkes}; here the disclosure time is observed and the task is
-post-event response prediction.
+The architecture is related to recurrent and state-space sequence models, including LSTMs and gated
+recurrent units \citep{hochreiter1997long,cho2014learning}, structured state-space sequence models
+\citep{gu2022s4}, and selective state-space models \citep{gu2023mamba,wang2025ssmbottleneck}. It
+also draws on probabilistic forecasting and time-series foundation model work
+\citep{dawid1984prequential,gneiting2007strictly,salinas2020deepar,lim2021temporal,
+nie2023patchtst,ansari2024chronos,wu2024moment}.
 
 Financial text contains information relevant to prices and fundamentals
 \citep{tetlock2007giving,tetlock2008more,kogan2009predicting,loughran2011liability,cohen2020lazy}.
 Recent financial NLP systems and benchmarks study domain language models, multimodal financial
 forecasting, SEC filing reasoning, and leakage in financial agents
-\citep{jegadeesh2013word,araci2019finbert,wu2023bloomberggpt,yang2023fingpt,kong2025timemqa,
-chen2025camef,islam2023financebench,finrate2026,li2025profitmirage}. RC-DJB is also adjacent to
-causal representation and counterfactual outcome models
-\citep{rubin1974estimating,rosenbaum1983central,melnychuk2022causaltransformer,
-feng2024gtransformer}. DJB differs by routing event text through an explicit residual
-distributional transport module; RC-DJB further imposes a target-specific restriction in which
-disclosure text may transport response distribution components while the abnormal-return mean
-remains no-event anchored.
+\citep{jegadeesh2013word,araci2019finbert,wu2023bloomberggpt,yang2023fingpt,chen2025camef,
+li2025profitmirage}. RC-DJB is also adjacent to counterfactual prediction, although this paper does
+not estimate structural causal effects \citep{rubin1974estimating}. DJB differs by routing event
+text through an explicit residual distributional transport module; RC-DJB further imposes a
+target-specific restriction in which disclosure text may transport response distribution components
+while the abnormal-return mean remains no-event anchored.
 
 \section{Method}
 
@@ -370,8 +363,8 @@ on the same
 chronological event/control rows and event-window labels as the other models; it removes disclosure
 text rather than changing the training substrate. Confidence intervals use percentile
 bootstrap resampling; ticker-clustered intervals resample tickers with replacement
-\citep{efron1979bootstrap,efron1993introduction,davison1997bootstrap,cameron2008bootstrap,
-cameron2015practitioner}. Paired comparisons use row-paired bootstrap resampling. Rank IC is
+\citep{efron1979bootstrap,davison1997bootstrap,cameron2008bootstrap}. Paired comparisons use
+row-paired bootstrap resampling. Rank IC is
 Spearman correlation between predicted and realized abnormal return
 \citep{spearman1904proof,grinold2000active}.
 
@@ -433,8 +426,8 @@ and empirical coverage is
 \end{equation}
 Mean predictive standard deviation is
 \(\frac{1}{NK}\sum_{i,k}\exp(\ell_{1,ik}/2)\). Interval coverage is reported because calibrated
-predictive uncertainty is distinct from point forecast error \citep{winkler1972score,
-gneiting2007strictly,gneiting2007probabilistic,gneiting2014probabilistic}.
+predictive uncertainty is distinct from point forecast error
+\citep{winkler1972score,gneiting2007strictly}.
 
 \begin{table}[H]
 \centering

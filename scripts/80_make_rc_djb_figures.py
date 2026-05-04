@@ -164,7 +164,6 @@ def make_architecture_figure(path: Path) -> None:
         start: tuple[float, float],
         end: tuple[float, float],
         *,
-        color: str = palette["line"],
         lw: float = 1.45,
     ) -> None:
         patch = FancyArrowPatch(
@@ -173,7 +172,7 @@ def make_architecture_figure(path: Path) -> None:
             arrowstyle="-|>",
             mutation_scale=11,
             linewidth=lw,
-            color=color,
+            color=palette["ink"],
             shrinkA=0,
             shrinkB=0,
             connectionstyle="arc3,rad=0",
@@ -185,7 +184,6 @@ def make_architecture_figure(path: Path) -> None:
     def elbow_arrow(
         points: list[tuple[float, float]],
         *,
-        color: str = palette["line"],
         lw: float = 1.35,
     ) -> None:
         path = MplPath(points, [MplPath.MOVETO] + [MplPath.LINETO] * (len(points) - 1))
@@ -194,7 +192,7 @@ def make_architecture_figure(path: Path) -> None:
             arrowstyle="-|>",
             mutation_scale=11,
             linewidth=lw,
-            color=color,
+            color=palette["ink"],
             shrinkA=0,
             shrinkB=0,
             joinstyle="miter",
@@ -305,13 +303,11 @@ def make_architecture_figure(path: Path) -> None:
     arrow(
         (left_center, y_encoder - edge_gap),
         (left_center, y_transport + box_h + edge_gap),
-        color=palette["protected"],
         lw=1.25,
     )
     arrow(
         (right_center, y_encoder - edge_gap),
         (right_center, y_transport + box_h + edge_gap),
-        color=palette["muted"],
         lw=1.20,
     )
     elbow_arrow(
@@ -321,7 +317,6 @@ def make_architecture_figure(path: Path) -> None:
             (0.430, 0.300),
             (0.430, output_top + edge_gap),
         ],
-        color=palette["protected"],
         lw=1.20,
     )
     elbow_arrow(
@@ -331,7 +326,6 @@ def make_architecture_figure(path: Path) -> None:
             (0.570, 0.300),
             (0.570, output_top + edge_gap),
         ],
-        color=palette["line"],
         lw=1.20,
     )
 
