@@ -621,53 +621,10 @@ zero and require stability auditing.}
 \includegraphics[width=0.96\linewidth]{figures/rc_djb_bridge_vector_field.pdf}
 \caption{Held-out response-state transport induced by the disclosure bridge. The background shows
 real 8-K density in the no-bridge volatility/volume response plane, blue points show matched
-controls, and arrows show binned mean shifts in volatility-jump and volume-jump predictions.}
+controls, and arrows show binned mean shifts in volatility-jump and volume-jump predictions. This
+visualizes the main bridge claim: disclosure text acts through response-distribution transport
+rather than a single unconstrained fusion head.}
 \label{fig:bridge-field}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.96\linewidth]{figures/rc_djb_rank_decile_ribbons.pdf}
-\caption{Predicted abnormal-return decile profiles on held-out real 8-K rows. Lines show realized
-five-day abnormal-return means; ribbons are 95\% row-bootstrap confidence intervals computed within
-each predicted decile.}
-\label{fig:rank-deciles}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.96\linewidth]{figures/rc_djb_bridge_delta_ridges.pdf}
-\caption{Response-transport fingerprints under bridge interventions. Ridge densities compare
-mean absolute response transport for real disclosure rows and matched controls; vertical marks show
-within-row medians.}
-\label{fig:bridge-ridges}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.92\linewidth]{figures/rc_djb_intervention_story.pdf}
-\caption{Interventions show that the disclosure bridge matters for event-response error. Rank IC
-does not move under text interventions because the return-mean firewall prevents direct
-text-to-return overwriting.}
-\label{fig:interventions}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.96\linewidth]{figures/rc_djb_event_calendar_atlas.pdf}
-\caption{Held-out disclosure-response atlas for the most frequent test tickers. Marker area is the
-number of filings in the ticker-month cell and marker color is mean bridge transport, exposing
-heterogeneity across firms and calendar months.}
-\label{fig:event-atlas}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.94\linewidth]{figures/rc_djb_monthly_rank_heatmap.pdf}
-\caption{Monthly event-rank IC over held-out real 8-K rows. The model-level rank result is not
-uniform across months, motivating ticker-clustered intervals and leave-one-ticker-out stability
-checks rather than a single unqualified rank statistic.}
-\label{fig:rank-heatmap}
 \end{figure}
 
 \FloatBarrier
@@ -684,8 +641,9 @@ different training substrate; it is the learned residual distributional bridge.
 DJB's ticker-clustered Rank IC interval is [-0.0042, 0.0710], so the rank result should not be
 reported as cluster-significant. The leave-one-ticker-out audit is still informative: deleting any
 single held-out ticker leaves DJB Rank IC positive, with minimum 0.0263 after removing KLAC and
-maximum 0.0381 after removing COST. Figure~\ref{fig:rank-deciles} shows the same pattern visually:
-the rank profile contains signal, but it is not a monotone large-effect curve.
+maximum 0.0381 after removing COST. The supplementary decile profile in
+Figure~\ref{fig:rank-deciles} shows the same pattern visually: the rank profile contains signal,
+but it is not a monotone large-effect curve.
 
 \paragraph{The no-event baseline is not the DJB anchor.}
 The standalone No-event model has negative held-out rank IC, but this does not imply that
@@ -727,10 +685,10 @@ that the rank regularizer helps shape the ordering objective but does not create
 cluster-significant trading claim.
 
 \paragraph{The bridge response is heterogeneous.}
-The ticker-month atlas in Figure~\ref{fig:event-atlas} shows that bridge transport is not a uniform
-offset applied to all disclosures. Transport magnitude varies across firms and months, consistent
-with event-study evidence that disclosure response depends on the event, firm, and market state
-\citep{beaver1968information,patell1984anticipated,kothari2007econometrics}.
+The supplementary ticker-month atlas in Figure~\ref{fig:event-atlas} shows that bridge transport is
+not a uniform offset applied to all disclosures. Transport magnitude varies across firms and
+months, consistent with event-study evidence that disclosure response depends on the event, firm,
+and market state \citep{beaver1968information,patell1984anticipated,kothari2007econometrics}.
 
 \section{Reproducibility}
 
@@ -778,6 +736,52 @@ strongest response forecaster, while RC-DJB clarifies what changes when a return
 imposed. The resulting principle is architectural and testable: model disclosures as distributional
 jumps, audit return-ranking claims under ticker-clustered uncertainty, and separate return-mean
 transport from risk, liquidity, and uncertainty transport.
+
+\clearpage
+\appendix
+\renewcommand{\thefigure}{A.\arabic{figure}}
+\setcounter{figure}{0}
+\section{Supplementary Visual Diagnostics}
+
+The following figures provide secondary robustness and heterogeneity views without changing the
+paper's main empirical claims.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_bridge_delta_ridges.pdf}
+\caption{Response-transport fingerprints under bridge interventions. Ridge densities compare
+mean absolute response transport for real disclosure rows and matched controls; vertical marks show
+within-row medians.}
+\label{fig:bridge-ridges}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_rank_decile_ribbons.pdf}
+\caption{Predicted abnormal-return decile profiles on held-out real 8-K rows. Lines show realized
+five-day abnormal-return means; ribbons are 95\% row-bootstrap confidence intervals computed within
+each predicted decile. The non-monotone profile is consistent with a positive but fragile ranking
+signal rather than a large trading-style effect.}
+\label{fig:rank-deciles}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_event_calendar_atlas.pdf}
+\caption{Held-out disclosure-response atlas for the most frequent test tickers. Marker area is the
+number of filings in the ticker-month cell and marker color is mean bridge transport, exposing
+heterogeneity across firms and calendar months.}
+\label{fig:event-atlas}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.94\linewidth]{figures/rc_djb_monthly_rank_heatmap.pdf}
+\caption{Monthly event-rank IC over held-out real 8-K rows. The model-level rank result is not
+uniform across months, motivating ticker-clustered intervals and leave-one-ticker-out stability
+checks rather than a single unqualified rank statistic.}
+\label{fig:rank-heatmap}
+\end{figure}
 
 \begingroup
 \footnotesize

@@ -68,7 +68,6 @@ def main() -> None:
     make_rank_decile_ribbons(output_dir / "rc_djb_rank_decile_ribbons.png")
     make_bridge_delta_ridges(output_dir / "rc_djb_bridge_delta_ridges.png")
     make_firewall_audit(output_dir / "rc_djb_firewall_audit.png")
-    make_intervention_story(output_dir / "rc_djb_intervention_story.png")
     make_event_calendar_atlas(output_dir / "rc_djb_event_calendar_atlas.png")
     make_monthly_rank_heatmap(output_dir / "rc_djb_monthly_rank_heatmap.png")
 
