@@ -180,6 +180,14 @@ implemented targets are
     &= \frac{|\mathcal{P}_i|}{|\mathcal{W}_i|}
     \frac{\sum_{t\in\mathcal{W}_i} V_{i,t}}{\sum_{t\in\mathcal{P}_i} V_{i,t}} - 1.
 \end{align}
+The three targets are deliberately not identical event-study estimands. The return target is a
+conservative forward-drift label anchored at the label-start close; for a filing accepted before the
+market close, it therefore does not try to identify the intraday filing-day price jump from daily
+bars. A previous-close denominator would capture more immediate repricing, but with daily data it
+also mixes pre-filing intraday movement into the disclosure response. Volatility and volume are
+different response-distribution targets, so the filing-day session is included whenever the filing
+is public before the close. This convention tests whether disclosure text helps transport
+risk/liquidity response while leaving cross-sectional return ranking to the no-event state.
 Rows are admissible only when their maximum feature date is strictly before the label start,
 \(\max\{t:t\in X_i\}<\tau_i\).
 
@@ -608,6 +616,17 @@ also has positive rank IC, but its MSE is much worse than RC-DJB. The decile pro
 Figure~\ref{fig:rank-deciles} show that this signal is uneven and noisy, rather than a monotone
 large-effect ranking curve.
 
+\paragraph{The no-event baseline is not the RC-DJB anchor.}
+The standalone No-event model has negative held-out rank IC, but this does not imply that
+pre-event market state is intrinsically anti-predictive. That baseline must explain
+disclosure-window returns, volatility, and volume using only ordinary market history and metadata.
+RC-DJB instead trains its no-event state jointly with a disclosure bridge, control penalty,
+likelihood term, and rank objective. The bridge absorbs event-response variation in volatility,
+volume, and uncertainty, while the return firewall prevents high-dimensional text from directly
+rewriting the abnormal-return mean. The empirical claim is therefore not that an isolated no-event
+forecaster is sufficient; it is that a jointly trained no-event return anchor is useful when
+disclosure text is routed through response-distribution transport.
+
 \paragraph{The bridge improves response modeling without moving return means.}
 RC-DJB improves paired MSE over concat fusion by 0.0043 and over DOT by 0.0042. Removing the bridge
 raises event-row MSE by 0.0066; zeroing or shuffling text raises event-row MSE by 0.0049 and
@@ -647,16 +666,23 @@ included in model inputs.
 
 \section{Limitations}
 
-The study has several limitations. The universe is large-cap biased and may contain survivorship
-effects, ticker-history issues, and 8-K item-mix sensitivity. The price source is public daily data
-rather than CRSP or intraday trades and quotes. Abnormal returns are SPY-adjusted rather than
-factor-model residuals \citep{fama1993common,carhart1997persistence}. BGE-small is a
-general-purpose encoder, and filings are represented by
-chunk mean pooling rather than a trained long-document financial encoder. Rank IC is statistically
-positive but economically small; transaction costs, capacity, and portfolio construction are outside
-the scope of this study \citep{grinold2000active,novymarx2016taxonomy,frazzini2018trading,
-lopezdeprado2018advances}. The return firewall is an architectural and predictive constraint, not
-structural causal identification
+The study is intentionally scoped to a leakage-controlled architecture test. The 98-firm universe is
+a dense large-cap disclosure-response panel, not an all-equity trading universe; scaling the same
+protocol to broader S\&P 500, Russell 3000, small-cap, and low-liquidity samples is the natural
+external-validity test. The price source is public daily data rather than CRSP or intraday trades
+and quotes, so the return label is designed as a conservative forward-drift target rather than an
+immediate jump estimator. A previous-close or intraday label would answer a complementary question
+about first-session repricing. Abnormal returns are SPY-adjusted rather than factor-model residuals
+\citep{fama1993common,carhart1997persistence}. BGE-small is a general-purpose encoder with chunk
+mean pooling; domain-specific or long-document financial encoders such as FinBERT,
+BloombergGPT-style models, FinGPT, or SEC-specialized long-context encoders could change absolute
+response error \citep{araci2019finbert,wu2023bloomberggpt,yang2023fingpt}. Because all text-aware
+models in the main experiment share the same frozen text representation, the reported comparison
+isolates the routing architecture rather than encoder scale. Rank IC is statistically positive but
+economically small; net performance after spreads, commissions, market impact, borrow constraints,
+capacity, and turnover requires a separate portfolio-construction study
+\citep{grinold2000active,novymarx2016taxonomy,frazzini2018trading,lopezdeprado2018advances}. The
+return firewall is an architectural and predictive constraint, not structural causal identification
 \citep{rubin1974estimating,imbens2015causal}.
 
 \section{Ethics and Use}
@@ -668,10 +694,10 @@ independent reproduction, and falsification of the empirical claims.
 \section{Conclusion}
 
 RC-DJB shows that the route by which disclosure text enters a financial event model matters. Letting
-text directly move the abnormal-return mean is not necessary for response modeling and appears to
-harm ranking in this setting. A return-conservative distributional bridge obtains positive
-held-out rank IC while still improving multi-target event-response MSE over concat fusion and DOT.
-The evidence supports a more precise architecture principle for disclosure modeling: use text to
+text directly move the abnormal-return mean is not required for strong response modeling. A
+return-conservative distributional bridge obtains positive held-out rank IC while still improving
+multi-target event-response MSE over concat fusion and DOT. The evidence supports a more precise
+architecture principle for disclosure modeling: use text to
 transport response risk, liquidity, and uncertainty, but keep near-term return ranking anchored to
 the no-event market state unless stronger evidence justifies crossing that boundary.
 
