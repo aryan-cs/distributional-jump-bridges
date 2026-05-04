@@ -87,7 +87,7 @@ def _plot_metric_comparison(metrics: dict[str, dict], figure_dir: Path) -> Path:
     ]
     path = figure_dir / "metric_comparison.png"
     plt.figure(figsize=(8, 4.5))
-    plt.bar(names, values, yerr=yerr, capsize=4, color="#5f5f5f")
+    plt.bar(names, values, yerr=yerr, capsize=4, color="#5891ed")
     plt.ylabel("MSE, lower is better")
     plt.title("Forecast Error With Bootstrap 95% CI")
     plt.xticks(range(len(names)), [_display_name(name) for name in names], rotation=15, ha="right")
@@ -112,7 +112,7 @@ def _plot_rank_ic(metrics: dict[str, dict], figure_dir: Path) -> Path:
         [max(value - lo, 0.0) for value, lo in zip(values, lows, strict=False)],
         [max(hi - value, 0.0) for value, hi in zip(values, highs, strict=False)],
     ]
-    colors = ["#b3b3b3" if name != "cebt" else "#242424" for name in names]
+    colors = ["#9fb3bc" if name != "cebt" else "#242424" for name in names]
     path = figure_dir / "rank_ic_comparison.png"
     plt.figure(figsize=(8, 4.5))
     plt.bar(names, values, yerr=yerr, capsize=4, color=colors)
@@ -172,7 +172,7 @@ def _plot_architecture(figure_dir: Path) -> Path:
     plt.figure(figsize=(11, 5.2))
     ax = plt.gca()
     ax.set_axis_off()
-    colors = ["#eeeeee", "#eeeeee", "#d0d0d0", "#b8b8b8", "#666666", "#666666", "#242424"]
+    colors = ["#dbe4ee", "#dbe4ee", "#b9d3f5", "#ffe1b8", "#334155", "#334155", "#242424"]
     text_colors = ["#242424", "#242424", "#242424", "#242424", "white", "white", "white"]
     for (x, y, text), color, text_color in zip(boxes, colors, text_colors, strict=False):
         ax.add_patch(
@@ -215,7 +215,7 @@ def _plot_prediction_scatter(predictions: list[dict], figure_dir: Path) -> Path:
     y = [row["target_abnormal_return"] for row in rows]
     path = figure_dir / "prediction_scatter.png"
     plt.figure(figsize=(5.5, 5.0))
-    plt.scatter(x, y, s=24, alpha=0.75, color="#4f4f4f")
+    plt.scatter(x, y, s=24, alpha=0.75, color="#58ed8a")
     plt.axhline(0.0, color="black", linewidth=0.8)
     plt.axvline(0.0, color="black", linewidth=0.8)
     plt.xlabel("Predicted abnormal return")
@@ -339,7 +339,7 @@ def _plot_residual_distribution(predictions: list[dict], figure_dir: Path) -> Pa
         density=True,
         alpha=0.65,
         label="True 8-K events",
-        color="#4f4f4f",
+        color="#58ed8a",
     )
     plt.hist(
         control_values,
@@ -347,7 +347,7 @@ def _plot_residual_distribution(predictions: list[dict], figure_dir: Path) -> Pa
         density=True,
         alpha=0.55,
         label="Matched no-event controls",
-        color="#9d9d9d",
+        color="#ed9a58",
     )
     plt.xlabel("Absolute event residual")
     plt.ylabel("Density")
