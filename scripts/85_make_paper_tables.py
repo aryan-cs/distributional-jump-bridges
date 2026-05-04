@@ -197,6 +197,27 @@ def _residual_rows(metrics_by_model: dict[str, dict[str, Any]]) -> list[dict[str
                 "mean_abs_event_delta_true_events": true_delta,
                 "mean_abs_event_delta_controls": control_delta,
                 "event_to_control_delta_ratio": ratio,
+                "mean_abs_return_delta_true_events": metrics.get(
+                    "mean_abs_return_delta_true_events"
+                ),
+                "mean_abs_return_delta_controls": metrics.get(
+                    "mean_abs_return_delta_controls"
+                ),
+                "mean_abs_volatility_delta_true_events": metrics.get(
+                    "mean_abs_volatility_delta_true_events"
+                ),
+                "mean_abs_volatility_delta_controls": metrics.get(
+                    "mean_abs_volatility_delta_controls"
+                ),
+                "mean_abs_volume_delta_true_events": metrics.get(
+                    "mean_abs_volume_delta_true_events"
+                ),
+                "mean_abs_volume_delta_controls": metrics.get(
+                    "mean_abs_volume_delta_controls"
+                ),
+                "response_transport_auc": metrics.get("response_transport_auc"),
+                "volatility_transport_auc": metrics.get("volatility_transport_auc"),
+                "volume_transport_auc": metrics.get("volume_transport_auc"),
             }
         )
     return rows
@@ -218,8 +239,29 @@ def _rc_djb_intervention_rows() -> list[dict[str, Any]]:
                 "event_gaussian_nll": metrics.get("event_gaussian_nll"),
                 "abnormal_return_rank_ic": metrics.get("abnormal_return_rank_ic"),
                 "latent_jump_auc": metrics.get("latent_jump_auc"),
+                "response_transport_auc": metrics.get("response_transport_auc"),
+                "volatility_transport_auc": metrics.get("volatility_transport_auc"),
+                "volume_transport_auc": metrics.get("volume_transport_auc"),
                 "mean_abs_event_delta_true_events": metrics.get("mean_abs_event_delta_true_events"),
                 "mean_abs_event_delta_controls": metrics.get("mean_abs_event_delta_controls"),
+                "mean_abs_return_delta_true_events": metrics.get(
+                    "mean_abs_return_delta_true_events"
+                ),
+                "mean_abs_return_delta_controls": metrics.get(
+                    "mean_abs_return_delta_controls"
+                ),
+                "mean_abs_volatility_delta_true_events": metrics.get(
+                    "mean_abs_volatility_delta_true_events"
+                ),
+                "mean_abs_volatility_delta_controls": metrics.get(
+                    "mean_abs_volatility_delta_controls"
+                ),
+                "mean_abs_volume_delta_true_events": metrics.get(
+                    "mean_abs_volume_delta_true_events"
+                ),
+                "mean_abs_volume_delta_controls": metrics.get(
+                    "mean_abs_volume_delta_controls"
+                ),
                 "return_logvar_delta_signed_rank_ic": metrics.get(
                     "return_logvar_delta_signed_rank_ic"
                 ),

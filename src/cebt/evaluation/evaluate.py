@@ -89,6 +89,36 @@ def evaluate_model(
         "calibration_error": calibration_error(predictions[:, 0], targets[:, 0]),
         "mean_abs_event_delta_true_events": _masked_abs_mean(deltas, is_event >= 0.5),
         "mean_abs_event_delta_controls": _masked_abs_mean(deltas, is_event < 0.5),
+        "mean_abs_return_delta_true_events": _masked_channel_abs_mean(
+            deltas,
+            is_event >= 0.5,
+            channel=0,
+        ),
+        "mean_abs_return_delta_controls": _masked_channel_abs_mean(
+            deltas,
+            is_event < 0.5,
+            channel=0,
+        ),
+        "mean_abs_volatility_delta_true_events": _masked_channel_abs_mean(
+            deltas,
+            is_event >= 0.5,
+            channel=1,
+        ),
+        "mean_abs_volatility_delta_controls": _masked_channel_abs_mean(
+            deltas,
+            is_event < 0.5,
+            channel=1,
+        ),
+        "mean_abs_volume_delta_true_events": _masked_channel_abs_mean(
+            deltas,
+            is_event >= 0.5,
+            channel=2,
+        ),
+        "mean_abs_volume_delta_controls": _masked_channel_abs_mean(
+            deltas,
+            is_event < 0.5,
+            channel=2,
+        ),
         "mean_abs_latent_event_true_events": _masked_abs_mean(latents, is_event >= 0.5),
         "mean_abs_latent_event_controls": _masked_abs_mean(latents, is_event < 0.5),
         "event_mse": _masked_mse(predictions, targets, is_event >= 0.5),
@@ -303,6 +333,16 @@ def _masked_abs_mean(values: np.ndarray, mask: np.ndarray) -> float | None:
     if not np.any(mask):
         return None
     return float(np.mean(np.abs(values[mask])))
+
+
+def _masked_channel_abs_mean(
+    values: np.ndarray,
+    mask: np.ndarray,
+    channel: int,
+) -> float | None:
+    if values.ndim != 2 or values.shape[1] <= channel or not np.any(mask):
+        return None
+    return float(np.mean(np.abs(values[mask, channel])))
 
 
 def _row_abs_mean(values: np.ndarray) -> np.ndarray:
