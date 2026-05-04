@@ -2,19 +2,23 @@
 
 ## Title
 
-Counterfactual Event Bottlenecks for Leakage-Safe Financial Disclosure Modeling
+Distributional Jump Bridges Improve SEC Disclosure Response Forecasts
 
 ## Thesis
 
-Event-driven financial models should model ordinary market dynamics separately from event-induced residuals. A compact stochastic event bottleneck improves interpretability, leakage resistance, and event-specific generalization.
+SEC disclosures should be modeled as jumps in a predictive response distribution rather than as
+unstructured feature concatenation. A bridge from no-event dynamics to event-response outcomes
+improves response-error modeling and exposes which channels are actually changed by disclosure text.
 
 ## Sections
 
 1. Introduction
 2. Related Work
-3. Counterfactual Event Bottleneck Transformer
-4. Leakage-Safe Event Feature Construction
+3. Method
+4. Data and Labels
 5. Experiments
-6. Ablations and Diagnostics
-7. Limitations
-8. Conclusion
+6. Findings
+7. Reproducibility
+8. Limitations
+9. Responsible Use
+10. Conclusion

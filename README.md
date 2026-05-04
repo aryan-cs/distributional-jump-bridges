@@ -87,10 +87,20 @@ uv run python scripts/50_eval.py --config configs/paper_v3_ejssm.yaml --model-na
 uv run python scripts/70_make_tables.py --config configs/paper_v3.yaml --output-dir data/runs/paper_v3
 ```
 
-Then build the BGE-small disclosure embeddings and train the headline RC-DJB run:
+Then build the BGE-small disclosure embeddings and train the headline DJB run:
 
 ```bash
 uv run python scripts/30_build_features.py --config configs/paper_v3_bge.yaml --output-dir data/processed/paper_v3_bge
+uv run python scripts/40_train.py --config configs/paper_v3_bge_djb.yaml --model-name djb --output-dir data/runs/paper_v3_bge_djb_best
+uv run python scripts/50_eval.py --config configs/paper_v3_bge_djb.yaml --model-name djb --output-dir data/runs/paper_v3_bge_djb_best
+uv run python scripts/50_eval.py --config configs/paper_v3_bge_djb.yaml --model-name djb --output-dir data/runs/paper_v3_bge_djb_best --intervention no_jump
+uv run python scripts/50_eval.py --config configs/paper_v3_bge_djb.yaml --model-name djb --output-dir data/runs/paper_v3_bge_djb_best --intervention zero_event
+uv run python scripts/50_eval.py --config configs/paper_v3_bge_djb.yaml --model-name djb --output-dir data/runs/paper_v3_bge_djb_best --intervention shuffle_event
+```
+
+Train the return-conservative diagnostic variant with:
+
+```bash
 uv run python scripts/40_train.py --config configs/paper_v3_bge_rc_djb.yaml --model-name rc_djb --output-dir data/runs/paper_v3_bge_rc_djb_best
 uv run python scripts/50_eval.py --config configs/paper_v3_bge_rc_djb.yaml --model-name rc_djb --output-dir data/runs/paper_v3_bge_rc_djb_best
 uv run python scripts/50_eval.py --config configs/paper_v3_bge_rc_djb.yaml --model-name rc_djb --output-dir data/runs/paper_v3_bge_rc_djb_best --intervention no_jump
@@ -116,6 +126,10 @@ system or to dominate every MSE-only ablation.
 
 The current draft lives at `paper/main.tex`, the compiled PDF is `paper/main.pdf`, figures are in
 `paper/figures/`, and table exports are in `paper/tables/`.
+
+The GitHub repository contains source code, configs, tests, table/figure scripts, and paper source.
+Generated artifacts such as processed metadata, downloaded prices, checkpoints, and cached
+predictions are intentionally excluded from Git and should be regenerated with the commands above.
 
 ## Data Policy
 

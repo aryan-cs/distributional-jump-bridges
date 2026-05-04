@@ -692,11 +692,14 @@ response depends on the event, firm, and market state
 
 \section{Reproducibility}
 
-The replication package includes the configurations, processed metadata, checkpoints, predictions,
-tables, and figures required to reproduce the reported results. Automated tests cover timestamp
-gating, after-hours label starts, feature leakage rejection, control construction, deterministic
-tensor generation, finite model losses, probabilistic loss integration, and evaluation leakage
-guards. Labels are computed only from future price windows and are never included in model inputs.
+The public code repository provides the configurations, data-ingestion scripts, model
+implementations, evaluation code, tables, and figure-generation scripts used in this study:
+\url{https://github.com/aryan-cs/dl-research}. Large generated artifacts such as processed
+metadata, checkpoints, cached predictions, and downloaded market files are not tracked in Git; they
+are reproducible from the documented pipeline. Automated tests cover timestamp gating, after-hours
+label starts, feature leakage rejection, control construction, deterministic tensor generation,
+finite model losses, probabilistic loss integration, and evaluation leakage guards. Labels are
+computed only from future price windows and are never included in model inputs.
 
 \section{Limitations}
 

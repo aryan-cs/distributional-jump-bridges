@@ -1,4 +1,4 @@
-"""Evaluate CEBT or baseline checkpoints."""
+"""Evaluate DJB or baseline checkpoints."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from cebt.evaluation.evaluate import evaluate_model
 
 
 def main() -> None:
-    args = parse_args("Evaluate CEBT")
+    args = parse_args("Evaluate DJB")
     config = load_run_config(args.config)
     run_dir = output_dir(args, "data/runs/pilot")
     features = processed_dir(config)

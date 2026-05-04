@@ -1,4 +1,4 @@
-"""Fast code-path smoke test for CEBT modules."""
+"""Fast code-path smoke test for DJB research modules."""
 
 from __future__ import annotations
 
@@ -6,16 +6,16 @@ import numpy as np
 import torch
 
 from cebt.cli import load_run_config, output_dir, parse_args
-from cebt.models.cebt import CEBTConfig, build_model
+from cebt.models.cebt import ModelConfig, build_model
 from cebt.training.losses import LossWeights, cebt_loss
 from cebt.utils.io import write_json
 
 
 def main() -> None:
-    args = parse_args("Run CEBT code-path smoke test")
+    args = parse_args("Run DJB code-path smoke test")
     config = load_run_config(args.config)
     out = output_dir(args, "data/runs/smoke")
-    model_config = CEBTConfig.from_dict(config.get("model", {}))
+    model_config = ModelConfig.from_dict(config.get("model", {}))
     model = build_model(args.model_name, model_config)
     batch = {
         "x_pre": torch.randn(4, 8, model_config.price_features),

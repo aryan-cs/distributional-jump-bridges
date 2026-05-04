@@ -1,4 +1,4 @@
-"""Run CEBT baseline ablations."""
+"""Run DJB baseline ablations."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from cebt.utils.io import write_json
 
 
 def main() -> None:
-    args = parse_args("Run CEBT ablations")
+    args = parse_args("Run DJB ablations")
     config = load_run_config(args.config)
     run_dir = output_dir(args, "data/runs/pilot")
     features = processed_dir(config)
@@ -22,8 +22,8 @@ def main() -> None:
         ("no_event", config),
         ("text_only", config),
         ("concat", config),
-        ("cebt_no_controls", _without_control_loss(config)),
-        ("cebt", config),
+        ("bottleneck_no_controls", _without_control_loss(config)),
+        ("bottleneck", config),
     ]
     for model_name, model_config in specs:
         train_model(model_config, feature_path, run_dir, model_name=model_name)

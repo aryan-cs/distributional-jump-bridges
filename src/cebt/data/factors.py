@@ -118,7 +118,7 @@ def factor_rows_by_date(rows: list[FactorRow]) -> dict[date, FactorRow]:
 
 
 def _download_first_csv_from_zip(url: str) -> str:
-    response = requests.get(url, timeout=90, headers={"User-Agent": "CEBT research"})
+    response = requests.get(url, timeout=90, headers={"User-Agent": "DJB research"})
     response.raise_for_status()
     with zipfile.ZipFile(BytesIO(response.content)) as archive:
         names = [name for name in archive.namelist() if name.lower().endswith(".csv")]

@@ -1,4 +1,4 @@
-"""Leakage-safe tensor feature construction for CEBT."""
+"""Leakage-safe tensor feature construction for disclosure-response models."""
 
 from __future__ import annotations
 

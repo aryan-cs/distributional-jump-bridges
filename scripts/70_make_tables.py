@@ -8,7 +8,7 @@ from cebt.cli import output_dir, parse_args
 
 
 def main() -> None:
-    args = parse_args("Make CEBT tables")
+    args = parse_args("Make DJB tables")
     run_dir = output_dir(args, "data/runs/pilot")
     print({"tables": make_tables(run_dir), "figures": make_figures(run_dir)})
 

@@ -18,8 +18,8 @@ from cebt.evaluation.metrics import (
     mse,
     rank_ic,
 )
-from cebt.models.cebt import CEBTConfig, build_model
-from cebt.training.dataset import CEBTTensorDataset
+from cebt.models.cebt import ModelConfig, build_model
+from cebt.training.dataset import EventTensorDataset
 from cebt.training.train import auto_device
 from cebt.utils.io import read_jsonl, write_json, write_jsonl
 
@@ -38,12 +38,12 @@ def evaluate_model(
     validate_feature_metadata(metadata_path)
     device = auto_device()
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    model_config = CEBTConfig.from_dict(checkpoint.get("model_config", config.get("model", {})))
+    model_config = ModelConfig.from_dict(checkpoint.get("model_config", config.get("model", {})))
     model = build_model(checkpoint.get("model_name", "cebt"), model_config).to(device)
     model.load_state_dict(checkpoint["state_dict"])
-    dataset = CEBTTensorDataset(feature_path, split=split)
+    dataset = EventTensorDataset(feature_path, split=split)
     if len(dataset) == 0:
-        dataset = CEBTTensorDataset(feature_path, split=1)
+        dataset = EventTensorDataset(feature_path, split=1)
     loader = DataLoader(dataset, batch_size=int(config.get("training", {}).get("batch_size", 32)))
     shuffled_embeddings = (
         _shuffled_embeddings(dataset, config) if intervention == "shuffle_event" else None
@@ -638,7 +638,7 @@ def _paired_event_control_gap(
     return bootstrap_ci(gap_values, lambda rows: float(np.mean(rows[:, 0])), n_boot=1000, seed=17)
 
 
-def _shuffled_embeddings(dataset: CEBTTensorDataset, config: dict[str, Any]) -> torch.Tensor:
+def _shuffled_embeddings(dataset: EventTensorDataset, config: dict[str, Any]) -> torch.Tensor:
     generator = torch.Generator()
     generator.manual_seed(int(config.get("seed", 7)) + 909)
     permutation = torch.randperm(len(dataset), generator=generator)

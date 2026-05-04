@@ -1,4 +1,4 @@
-"""Train CEBT or baseline models."""
+"""Train DJB or baseline models."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from cebt.training.train import train_model
 
 
 def main() -> None:
-    args = parse_args("Train CEBT")
+    args = parse_args("Train DJB")
     config = load_run_config(args.config)
     run_dir = output_dir(args, "data/runs/pilot")
     feature_path = processed_dir(config) / "features.npz"

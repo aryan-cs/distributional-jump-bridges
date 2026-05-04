@@ -11,8 +11,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from cebt.models.cebt import CEBTConfig, build_model
-from cebt.training.dataset import CEBTTensorDataset
+from cebt.models.cebt import ModelConfig, build_model
+from cebt.training.dataset import EventTensorDataset
 from cebt.training.losses import LossWeights, cebt_loss
 from cebt.utils.config import ensure_dir
 from cebt.utils.io import write_json
@@ -42,12 +42,12 @@ def train_model(
 ) -> dict[str, Any]:
     set_seed(int(config.get("seed", 7)))
     run_dir = ensure_dir(output_dir)
-    model_config = CEBTConfig.from_dict(config.get("model", {}))
+    model_config = ModelConfig.from_dict(config.get("model", {}))
     loss_weights = LossWeights.from_dict(config.get("loss", {}))
     training = config.get("training", {})
     device = auto_device()
-    train_ds = CEBTTensorDataset(feature_path, split=0)
-    val_ds = CEBTTensorDataset(feature_path, split=1)
+    train_ds = EventTensorDataset(feature_path, split=0)
+    val_ds = EventTensorDataset(feature_path, split=1)
     if len(train_ds) == 0:
         raise ValueError("No training rows in feature bundle.")
     target_mean, target_std = _target_stats(train_ds, device, loss_weights)
@@ -174,7 +174,7 @@ def evaluate_loss(
 
 
 def _target_stats(
-    train_ds: CEBTTensorDataset,
+    train_ds: EventTensorDataset,
     device: torch.device,
     loss_weights: LossWeights,
 ) -> tuple[torch.Tensor | None, torch.Tensor | None]:

@@ -1,4 +1,4 @@
-"""Figure generation for CEBT paper artifacts."""
+"""Figure generation for DJB paper artifacts."""
 
 from __future__ import annotations
 
@@ -58,8 +58,8 @@ def _display_name(model: str) -> str:
         "no_event": "No-event",
         "text_only": "Text-only",
         "concat": "Concat fusion",
-        "cebt_no_controls": "CEBT\n(no controls)",
-        "cebt": "CEBT",
+        "cebt_no_controls": "Bottleneck\n(no controls)",
+        "cebt": "Bottleneck",
     }.get(model, model)
 
 
@@ -220,7 +220,7 @@ def _plot_prediction_scatter(predictions: list[dict], figure_dir: Path) -> Path:
     plt.axvline(0.0, color="black", linewidth=0.8)
     plt.xlabel("Predicted abnormal return")
     plt.ylabel("Realized abnormal return")
-    plt.title("CEBT Event-Return Predictions")
+    plt.title("DJB Event-Return Predictions")
     plt.tight_layout()
     plt.savefig(path, dpi=200)
     plt.close()
@@ -240,7 +240,7 @@ def _plot_prediction_phase_portrait(predictions: list[dict], figure_dir: Path) -
     plt.axvline(0.0, color="white", linewidth=1.0, alpha=0.9)
     plt.xlabel("Predicted abnormal return")
     plt.ylabel("Realized abnormal return")
-    plt.title("CEBT Event-Return Phase Portrait")
+    plt.title("DJB Event-Return Phase Portrait")
     plt.tight_layout()
     plt.savefig(path, dpi=220)
     plt.close()
@@ -302,7 +302,7 @@ def _plot_event_residual_mosaic(predictions: list[dict], figure_dir: Path) -> Pa
     plt.figure(figsize=(width, height))
     masked = np.ma.masked_invalid(matrix)
     im = plt.imshow(masked, aspect="auto", cmap="Greys")
-    plt.colorbar(im, label="Mean absolute CEBT event residual")
+    plt.colorbar(im, label="Mean absolute DJB event residual")
     plt.yticks(range(len(tickers)), tickers)
     plt.xticks(range(len(months)), months, rotation=45, ha="right")
     plt.title("Disclosure Residual Mosaic by Company and Month")
@@ -351,7 +351,7 @@ def _plot_residual_distribution(predictions: list[dict], figure_dir: Path) -> Pa
     )
     plt.xlabel("Absolute event residual")
     plt.ylabel("Density")
-    plt.title("CEBT Residual Mass Shifts Away From No-Event Controls")
+    plt.title("DJB Residual Mass Shifts Away From No-Event Controls")
     plt.legend()
     plt.tight_layout()
     plt.savefig(path, dpi=220)

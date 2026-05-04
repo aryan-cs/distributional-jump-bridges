@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from cebt.models.cebt import CEBTConfig, build_model
+from cebt.models.cebt import ModelConfig, build_model
 from cebt.training.losses import (
     LossWeights,
     cebt_loss,
@@ -13,7 +13,7 @@ from cebt.training.losses import (
 
 
 def test_cebt_forward_shapes_and_finite_loss() -> None:
-    config = CEBTConfig(
+    config = ModelConfig(
         price_features=8, metadata_features=6, event_embedding_dim=16, hidden_dim=32, latent_dim=4
     )
     model = build_model("cebt", config)
@@ -34,8 +34,8 @@ def test_cebt_forward_shapes_and_finite_loss() -> None:
 
 
 def test_bottleneck_dimension_changes_latent_shape() -> None:
-    small = build_model("cebt", CEBTConfig(event_embedding_dim=16, hidden_dim=32, latent_dim=2))
-    large = build_model("cebt", CEBTConfig(event_embedding_dim=16, hidden_dim=32, latent_dim=8))
+    small = build_model("cebt", ModelConfig(event_embedding_dim=16, hidden_dim=32, latent_dim=2))
+    large = build_model("cebt", ModelConfig(event_embedding_dim=16, hidden_dim=32, latent_dim=8))
     x = torch.randn(2, 5, 8)
     e = torch.randn(2, 16)
     m = torch.randn(2, 6)
@@ -44,7 +44,7 @@ def test_bottleneck_dimension_changes_latent_shape() -> None:
 
 
 def test_disclosure_operator_forward_shapes() -> None:
-    config = CEBTConfig(
+    config = ModelConfig(
         price_features=8,
         metadata_features=6,
         event_embedding_dim=16,
@@ -66,7 +66,7 @@ def test_disclosure_operator_forward_shapes() -> None:
 
 
 def test_event_jump_state_space_forward_shapes_and_nll() -> None:
-    config = CEBTConfig(
+    config = ModelConfig(
         price_features=8,
         metadata_features=6,
         event_embedding_dim=16,
@@ -96,7 +96,7 @@ def test_event_jump_state_space_forward_shapes_and_nll() -> None:
 
 
 def test_event_jump_no_jump_intervention_zeroes_latent_jump() -> None:
-    config = CEBTConfig(
+    config = ModelConfig(
         price_features=8,
         metadata_features=6,
         event_embedding_dim=16,
@@ -114,7 +114,7 @@ def test_event_jump_no_jump_intervention_zeroes_latent_jump() -> None:
 
 
 def test_distributional_jump_bridge_forward_shapes_and_intervention() -> None:
-    config = CEBTConfig(
+    config = ModelConfig(
         price_features=8,
         metadata_features=6,
         event_embedding_dim=16,
@@ -146,7 +146,7 @@ def test_distributional_jump_bridge_forward_shapes_and_intervention() -> None:
 
 
 def test_return_conservative_djb_preserves_abnormal_return_mean_delta() -> None:
-    config = CEBTConfig(
+    config = ModelConfig(
         price_features=8,
         metadata_features=6,
         event_embedding_dim=16,
@@ -166,7 +166,7 @@ def test_return_conservative_djb_preserves_abnormal_return_mean_delta() -> None:
 
 
 def test_event_jump_can_exclude_control_metadata_from_jump_generator() -> None:
-    config = CEBTConfig(
+    config = ModelConfig(
         price_features=8,
         metadata_features=6,
         event_embedding_dim=16,

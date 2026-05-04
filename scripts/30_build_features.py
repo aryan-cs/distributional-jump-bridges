@@ -1,4 +1,4 @@
-"""Build leakage-safe CEBT tensor features."""
+"""Build leakage-safe event-model tensor features."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from cebt.utils.io import read_jsonl
 
 
 def main() -> None:
-    args = parse_args("Build CEBT features")
+    args = parse_args("Build event-model features")
     config = load_run_config(args.config)
     out = output_dir(args, "data/processed/pilot")
     source_out = _feature_source_dir(config) or out

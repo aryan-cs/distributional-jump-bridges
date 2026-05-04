@@ -99,7 +99,7 @@ def fetch_yahoo_prices(ticker: str, start_date: str, end_date: str) -> list[Pric
         f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
         f"?period1={start}&period2={end}&interval=1d&events=history"
     )
-    response = requests.get(url, timeout=60, headers={"User-Agent": "CEBT research"})
+    response = requests.get(url, timeout=60, headers={"User-Agent": "DJB research"})
     response.raise_for_status()
     payload = response.json()
     result = payload.get("chart", {}).get("result") or []

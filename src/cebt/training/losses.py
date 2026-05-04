@@ -1,4 +1,4 @@
-"""CEBT losses."""
+"""DJB training losses."""
 
 from __future__ import annotations
 

@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import Dataset
 
 
-class CEBTTensorDataset(Dataset):
+class EventTensorDataset(Dataset):
     def __init__(self, feature_path: str | Path, split: int | None = None) -> None:
         arrays = np.load(feature_path, allow_pickle=True)
         indices = np.arange(arrays["x_pre"].shape[0])

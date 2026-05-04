@@ -74,7 +74,7 @@ class SECClient:
         max_requests_per_second: float = 8.0,
     ) -> None:
         self.user_agent = (
-            user_agent or os.getenv("SEC_USER_AGENT") or "CEBT research contact@example.com"
+            user_agent or os.getenv("SEC_USER_AGENT") or "DJB research contact@example.com"
         )
         self.base_url = base_url.rstrip("/")
         self.archives_url = archives_url.rstrip("/")

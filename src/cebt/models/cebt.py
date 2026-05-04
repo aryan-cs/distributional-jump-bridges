@@ -1,4 +1,4 @@
-"""Counterfactual Event Bottleneck Transformer model."""
+"""Disclosure-response model family, including Distributional Jump Bridges."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from torch import nn
 
 
 @dataclass(frozen=True)
-class CEBTConfig:
+class ModelConfig:
     price_features: int = 8
     metadata_features: int = 6
     event_embedding_dim: int = 256
@@ -23,14 +23,14 @@ class CEBTConfig:
     dropout: float = 0.1
 
     @classmethod
-    def from_dict(cls, row: dict) -> CEBTConfig:
+    def from_dict(cls, row: dict) -> ModelConfig:
         return cls(**{key: row[key] for key in cls.__dataclass_fields__ if key in row})
 
 
 class NoEventDynamics(nn.Module):
     """Predict ordinary future movement from pre-event numeric windows."""
 
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.input_projection = nn.Linear(config.price_features, config.hidden_dim)
         encoder_layer = nn.TransformerEncoderLayer(
@@ -63,7 +63,7 @@ class NoEventDynamics(nn.Module):
 class EventBottleneck(nn.Module):
     """Compact stochastic latent representation of disclosure-induced change."""
 
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(config.event_embedding_dim + config.metadata_features, config.hidden_dim),
@@ -96,7 +96,7 @@ class EventBottleneck(nn.Module):
 class ResidualOutcomeHead(nn.Module):
     """Predict event-induced residual added to no-event dynamics."""
 
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(
@@ -118,7 +118,7 @@ class ResidualOutcomeHead(nn.Module):
 
 
 class CounterfactualEventBottleneckTransformer(nn.Module):
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.config = config
         self.no_event = NoEventDynamics(config)
@@ -147,7 +147,7 @@ class CounterfactualEventBottleneckTransformer(nn.Module):
 
 
 class NoEventOnlyModel(nn.Module):
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.no_event = NoEventDynamics(config)
 
@@ -170,7 +170,7 @@ class NoEventOnlyModel(nn.Module):
 
 
 class TextOnlyMLP(nn.Module):
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(config.event_embedding_dim + config.metadata_features, config.hidden_dim),
@@ -198,7 +198,7 @@ class TextOnlyMLP(nn.Module):
 
 
 class ConcatFusionModel(nn.Module):
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.no_event = NoEventDynamics(config)
         self.head = nn.Sequential(
@@ -238,7 +238,7 @@ class DisclosureOperatorTransformer(nn.Module):
     event influence observable as a state intervention.
     """
 
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.config = config
         self.no_event = NoEventDynamics(config)
@@ -308,7 +308,7 @@ class EventJumpStateSpaceModel(nn.Module):
     predicted. This makes event impact explicit as a learned state discontinuity.
     """
 
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.config = config
         self.jump_uses_metadata = config.jump_uses_metadata
@@ -407,14 +407,15 @@ class EventJumpStateSpaceModel(nn.Module):
 class DistributionalJumpBridgeModel(nn.Module):
     """Disclosure-conditioned transport from a no-event distribution to an event distribution.
 
-    EJSSM applies a latent state jump and then predicts a distribution from the jumped state.
+    The state-jump baseline applies a latent state jump and then predicts a distribution from the
+    jumped state.
     DJB makes the distributional intervention explicit: the market history first defines a
     no-event Gaussian forecast, and the disclosure bridge then applies bounded shifts to both the
     predictive mean and log-variance. This exposes whether text is changing the point forecast,
     the uncertainty estimate, or both.
     """
 
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         self.config = config
         self.jump_uses_metadata = config.jump_uses_metadata
@@ -534,13 +535,13 @@ class ReturnConservativeDistributionalJumpBridgeModel(DistributionalJumpBridgeMo
     more useful as a response-distribution operator than as a cross-sectional return-rank signal.
     """
 
-    def __init__(self, config: CEBTConfig) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__(config)
         self.transport_return_mean = False
 
 
-def build_model(model_name: str, config: CEBTConfig) -> nn.Module:
-    if model_name in {"cebt", "cebt_no_controls"}:
+def build_model(model_name: str, config: ModelConfig) -> nn.Module:
+    if model_name in {"cebt", "cebt_no_controls", "bottleneck", "bottleneck_no_controls"}:
         return CounterfactualEventBottleneckTransformer(config)
     if model_name == "no_event":
         return NoEventOnlyModel(config)
