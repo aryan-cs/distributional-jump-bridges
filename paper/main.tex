@@ -125,6 +125,27 @@ Each sample \(i\) has label start date \(\tau_i\), a 40-trading-day pre-event te
 five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump. The headline
 variant uses chunk-pooled BGE-small disclosure embeddings \citep{xiao2023cpack}.
 
+\paragraph{Event-study labels.}
+Let \(P_{i,t}\), \(V_{i,t}\), and \(r_{i,t}\) denote adjusted close, volume, and daily close return
+for firm \(i\), and let \(r^M_t\) denote the SPY return. The label window
+\(\mathcal{W}_i=\{\tau_i,\ldots,\eta_i\}\) starts on the disclosure date for before-close traded-day
+filings and on the next traded date otherwise; \(\eta_i\) is the fifth tradable session in the
+window. The pre-window
+\(\mathcal{P}_i\) is the 20 traded sessions strictly before \(\tau_i\). The implemented targets are
+\begin{align}
+    y_{i,r}
+    &= \frac{P_{i,\eta_i}}{P_{i,\tau_i}} - 1
+    - \left(\prod_{t\in\mathcal{W}_i}(1+r^M_t)-1\right),\\
+    y_{i,\sigma}
+    &= \operatorname{sd}_{t\in\mathcal{W}_i}(r_{i,t})
+    - \operatorname{sd}_{t\in\mathcal{P}_i}(r_{i,t}),\\
+    y_{i,V}
+    &= \frac{|\mathcal{P}_i|}{|\mathcal{W}_i|}
+    \frac{\sum_{t\in\mathcal{W}_i} V_{i,t}}{\sum_{t\in\mathcal{P}_i} V_{i,t}} - 1.
+\end{align}
+Rows are admissible only when their maximum feature date is strictly before the label start,
+\(\max\{t:t\in X_i\}<\tau_i\).
+
 \paragraph{No-event distribution.}
 A recurrent encoder maps pre-event market history to a latent state:
 \begin{equation}
@@ -159,19 +180,64 @@ Thus,
 The model predicts \(p_\theta(y_i)=\mathcal{N}(\mu_{1,i},\mathrm{diag}(\exp(\ell_{1,i})))\).
 
 \paragraph{Objective.}
-The main loss combines target-standardized Huber regression, Gaussian negative log likelihood,
-control suppression, bridge sparsity, residual consistency, and a pairwise rank regularizer:
+For target dimension \(k\), the Gaussian negative log likelihood used for probabilistic training
+and evaluation is
+\begin{equation}
+    \mathcal{L}_{NLL}
+    = \frac{1}{2NK}\sum_{i=1}^{N}\sum_{k=1}^{K}
+    \left[\exp(-\ell_{1,ik})(y_{ik}-\mu_{1,ik})^2+\ell_{1,ik}\right],
+    \qquad K=3,\quad \ell_{1,ik}\in[-7,3].
+\end{equation}
+The pairwise rank regularizer is computed only over real-disclosure pairs in a minibatch:
+\begin{equation}
+    \mathcal{L}_{rank}
+    = \frac{1}{|\mathcal{Q}|}\sum_{(i,j)\in\mathcal{Q}}
+    \log\left(1+\exp\left[
+    -\operatorname{sign}(y_{i,r}-y_{j,r})
+    \frac{\mu_{1,i,r}-\mu_{1,j,r}}{T}
+    \right]\right),
+\end{equation}
+where \(\mathcal{Q}\) contains event pairs with unequal abnormal-return labels and \(T=0.02\).
+The supervised term is the weighted Smooth-L1 loss after optional target standardization:
+\begin{equation}
+    \mathcal{L}_{Huber}
+    =
+    \frac{1}{NK}\sum_{i=1}^{N}\sum_{k=1}^{K}
+    w_k\operatorname{SmoothL1}_{\beta}
+    \left(\frac{\mu_{1,ik}-\bar{y}_k}{s_k},
+    \frac{y_{ik}-\bar{y}_k}{s_k}\right).
+\end{equation}
+For bottleneck models with posterior parameters \((\mu^z_i,\ell^z_i)\),
+\begin{equation}
+    \mathcal{L}_{KL}
+    = -\frac{1}{2}\operatorname{mean}_{i,k}
+    \left(1+\ell^z_{ik}-(\mu^z_{ik})^2-\exp(\ell^z_{ik})\right).
+\end{equation}
+The control and consistency penalties are
+\begin{align}
+    \mathcal{L}_{control}
+    &=
+    \frac{\sum_i\mathbb{1}\{a_i=0\}\lVert\Delta\mu_i\rVert_2^2}
+    {\sum_i\mathbb{1}\{a_i=0\}},\\
+    \mathcal{L}_{consistency}
+    &= \frac{1}{K}\sum_{k=1}^{K}\operatorname{Var}_i(\Delta\mu_{i,k}),
+\end{align}
+where \(a_i=1\) for real disclosures and \(a_i=0\) for matched controls.
+The full training loss combines target-standardized Huber regression, Gaussian likelihood, control
+suppression, bottleneck regularization, bridge sparsity, residual consistency, and rank learning:
 \begin{equation}
 \mathcal{L} =
-\lambda_y\mathcal{L}_{Huber}(D_y^{-1}(\mu_1-y);w_y)
+\lambda_y\mathcal{L}_{Huber}
 +\lambda_n\mathcal{L}_{NLL}
-+\lambda_c\mathbb{1}_{control}\lVert\Delta\mu_i\rVert_2^2
-+\lambda_s\lVert j_i\rVert_1
-+\lambda_v\mathrm{Var}(\Delta\mu_i)
++\lambda_c\mathcal{L}_{control}
++\lambda_{KL}\mathcal{L}_{KL}
++\lambda_s\lVert z_i\rVert_1
++\lambda_v\mathcal{L}_{consistency}
 +\lambda_r\mathcal{L}_{rank}.
 \end{equation}
-The main run uses \(w_y=(3.0,1.0,0.25)\), \(\lambda_n=0.10\), \(\lambda_c=0.35\),
-\(\lambda_s=0.001\), \(\lambda_v=0.05\), and \(\lambda_r=0.15\).
+Here \(z_i\) is the stored disclosure-bridge latent used for sparsity diagnostics. The main run
+uses \(w_y=(3.0,1.0,0.25)\), \(\lambda_n=0.10\), \(\lambda_c=0.35\),
+\(\lambda_{KL}=0.01\), \(\lambda_s=0.001\), \(\lambda_v=0.05\), and \(\lambda_r=0.15\).
 
 \section{Data and Leakage Controls}
 
@@ -184,9 +250,9 @@ hash.
 
 Daily prices are downloaded from public price endpoints, with SPY used as the market proxy for
 abnormal returns. The trading calendar is inferred from observed price rows. Event label windows
-start from the first tradable session after public availability; filings accepted after 16:00 ET or
-on non-trading days start on the next observed trading day. Features use only prices strictly before
-the label start date. Labels use future returns only as targets. One deterministic same-ticker
+start on the same observed trading day for filings accepted before 16:00 ET; filings accepted after
+16:00 ET or on non-trading days start on the next observed trading day. Features use only prices
+strictly before the label start date. Labels use future returns only as targets. One deterministic same-ticker
 no-event control is constructed for each filing, excluding dates within a 10-calendar-day blackout
 window around known events.
 
@@ -222,6 +288,64 @@ and an unconstrained Distributional Jump Bridge (DJB). Confidence intervals use 
 bootstrap resampling; ticker-clustered intervals resample tickers with replacement. Paired
 comparisons use row-paired bootstrap resampling. Rank IC is Spearman correlation between predicted
 and realized abnormal return.
+
+\paragraph{Evaluation statistics.}
+For model \(m\), the reported multi-target error is
+\begin{equation}
+    \operatorname{MSE}(m)
+    = \frac{1}{NK}\sum_{i=1}^{N}\sum_{k=1}^{K}
+    \left(y_{ik}-\hat{y}^{(m)}_{ik}\right)^2 .
+\end{equation}
+Rank IC is the Spearman correlation between predicted and realized abnormal return:
+\begin{equation}
+    \operatorname{IC}(m)
+    = \rho_P\left(
+    \operatorname{rank}(\hat{y}^{(m)}_{1:N,r}),
+    \operatorname{rank}(y_{1:N,r})
+    \right).
+\end{equation}
+For a statistic \(S\), bootstrap replicates \(S^{*(1)},\ldots,S^{*(B)}\) form percentile
+intervals
+\begin{equation}
+    \operatorname{CI}_{0.95}(S)
+    =
+    \left[Q_{0.025}\{S^{*(b)}\}_{b=1}^{B},
+    Q_{0.975}\{S^{*(b)}\}_{b=1}^{B}\right],
+\end{equation}
+The model-level intervals in Table~\ref{tab:main-results} use \(B=1000\). Ticker-clustered
+intervals sample tickers with replacement and include all held-out rows for each sampled ticker.
+Rank IC uses integer ranks of predicted and realized abnormal returns. Paired MSE comparisons
+against RC-DJB use \(B=2000\) row-paired bootstrap replicates and
+\begin{equation}
+    \Delta_{\operatorname{MSE}}(m)
+    = \frac{1}{N}\sum_{i=1}^{N}
+    \left[
+    \frac{1}{K}\lVert y_i-\hat{y}^{(m)}_i\rVert_2^2
+    -
+    \frac{1}{K}\lVert y_i-\hat{y}^{RC}_i\rVert_2^2
+    \right],
+\end{equation}
+with rows resampled as matched pairs. Paired rank comparisons use the same joined rows but report
+\(\operatorname{IC}(RC)-\operatorname{IC}(m)\).
+
+\paragraph{Probabilistic diagnostics.}
+For nominal level \(1-\alpha\), the diagonal Gaussian predictive interval for target \(k\) is
+\begin{equation}
+    I_{ik}(1-\alpha)
+    =
+    \left[
+    \mu_{1,ik}-z_{1-\alpha/2}\exp(\ell_{1,ik}/2),
+    \mu_{1,ik}+z_{1-\alpha/2}\exp(\ell_{1,ik}/2)
+    \right],
+\end{equation}
+and empirical coverage is
+\begin{equation}
+    \widehat{C}(1-\alpha)
+    = \frac{1}{NK}\sum_{i=1}^{N}\sum_{k=1}^{K}
+    \mathbb{1}\{y_{ik}\in I_{ik}(1-\alpha)\}.
+\end{equation}
+Mean predictive standard deviation is
+\(\frac{1}{NK}\sum_{i,k}\exp(\ell_{1,ik}/2)\).
 
 \begin{table}[H]
 \centering
@@ -263,6 +387,17 @@ EJSSM-BGE & -0.00076 & [-0.00163, 0.00005] & 0.0447 & [-0.0072, 0.0952] \\
 \end{tabular}
 \end{table}
 
+\paragraph{Bridge diagnostics.}
+The response-transport statistic for group \(c\in\{0,1\}\) is
+\begin{equation}
+    T_c
+    =
+    \operatorname{mean}_{i:a_i=c,k}\left|\Delta\mu_{i,k}\right|,
+\end{equation}
+where \(c=1\) denotes real 8-K rows and \(c=0\) denotes controls. Latent bridge AUC uses the score
+\(s_i=\operatorname{mean}_k|z_{i,k}|\) to classify real disclosures against matched controls, with
+average ranks used for tied scores.
+
 \begin{table}[H]
 \centering
 \caption{RC-DJB diagnostics on the held-out split.}
@@ -281,6 +416,14 @@ Latent bridge AUC, events vs. controls & 0.6038 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\paragraph{Intervention definitions.}
+The no-bridge intervention is the implementation's no-jump forward pass: it sets the bridge state
+jump, bridge hidden state, mean delta, and log-variance delta to zero, so \(\mu_1=\mu_0\) and
+\(\ell_1=\ell_0\). The zero-text intervention replaces \(e_i\) with the zero vector before the
+forward pass. The shuffled-text intervention applies one deterministic held-out permutation of
+disclosure embeddings. For RC-DJB, \(\Delta\mu_{return}=0\) in every variant, so abnormal-return
+point predictions and rank IC are invariant to these bridge interventions.
 
 \begin{table}[H]
 \centering
