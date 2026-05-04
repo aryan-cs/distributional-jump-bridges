@@ -17,7 +17,8 @@ The first implementation fits the existing tensor pipeline:
 
 1. A GRU state encoder maps 40 pre-event trading days to a latent state.
 2. A no-event transition predicts the ordinary continuation.
-3. Disclosure text and metadata generate a bounded jump vector.
+3. Disclosure text generates a bounded jump vector. Metadata remains available to the no-event
+   state and outcome head, but the main jump generator excludes event/control indicator metadata.
 4. The jumped state predicts abnormal return, volatility jump, and volume jump.
 5. A Gaussian head provides a first calibration target through a negative log-likelihood loss.
 

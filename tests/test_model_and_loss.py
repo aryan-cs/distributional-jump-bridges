@@ -89,6 +89,25 @@ def test_event_jump_state_space_forward_shapes_and_nll() -> None:
     assert metrics["nll"] == float(nll.detach().cpu())
 
 
+def test_event_jump_can_exclude_control_metadata_from_jump_generator() -> None:
+    config = CEBTConfig(
+        price_features=8,
+        metadata_features=6,
+        event_embedding_dim=16,
+        hidden_dim=32,
+        jump_uses_metadata=False,
+    )
+    model = build_model("ejssm", config)
+    first_layer = model.jump_generator[0]
+    assert first_layer.in_features == 16
+    embedding = torch.randn(2, 16)
+    x_pre = torch.randn(2, 5, 8)
+    metadata = torch.zeros(2, 6)
+    metadata[1, 1] = 1.0
+    outputs = model(x_pre, embedding, metadata)
+    assert outputs["z_event"].shape == (2, 32)
+
+
 def test_pairwise_rank_loss_rewards_correct_ordering_on_events() -> None:
     targets = torch.tensor([0.20, -0.10, 0.05, 0.50])
     is_event = torch.tensor([1.0, 1.0, 1.0, 0.0])

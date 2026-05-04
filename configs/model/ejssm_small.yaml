@@ -7,6 +7,7 @@ model:
   operator_rank: 4
   operator_scale: 0.10
   jump_scale: 0.20
+  jump_uses_metadata: false
   output_dim: 3
   dropout: 0.10
 loss:

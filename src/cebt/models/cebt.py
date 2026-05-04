@@ -18,6 +18,7 @@ class CEBTConfig:
     operator_rank: int = 4
     operator_scale: float = 0.10
     jump_scale: float = 0.20
+    jump_uses_metadata: bool = True
     output_dim: int = 3
     dropout: float = 0.1
 
@@ -307,6 +308,12 @@ class EventJumpStateSpaceModel(nn.Module):
     def __init__(self, config: CEBTConfig) -> None:
         super().__init__()
         self.config = config
+        self.jump_uses_metadata = config.jump_uses_metadata
+        jump_input_dim = (
+            config.event_embedding_dim + config.metadata_features
+            if self.jump_uses_metadata
+            else config.event_embedding_dim
+        )
         self.input_projection = nn.Linear(config.price_features, config.hidden_dim)
         self.encoder = nn.GRU(
             input_size=config.hidden_dim,
@@ -332,7 +339,7 @@ class EventJumpStateSpaceModel(nn.Module):
             nn.Linear(config.hidden_dim, config.output_dim),
         )
         self.jump_generator = nn.Sequential(
-            nn.Linear(config.event_embedding_dim + config.metadata_features, config.hidden_dim),
+            nn.Linear(jump_input_dim, config.hidden_dim),
             nn.LayerNorm(config.hidden_dim),
             nn.GELU(),
             nn.Dropout(config.dropout),
@@ -367,7 +374,12 @@ class EventJumpStateSpaceModel(nn.Module):
         no_event_state = state * (1.0 + 0.1 * gate)
         base_prediction = self.base_head(no_event_state)
 
-        jump_params = self.jump_generator(torch.cat([event_embedding, metadata], dim=-1))
+        jump_input = (
+            torch.cat([event_embedding, metadata], dim=-1)
+            if self.jump_uses_metadata
+            else event_embedding
+        )
+        jump_params = self.jump_generator(jump_input)
         jump_direction, jump_gate = torch.chunk(jump_params, chunks=2, dim=-1)
         jump = torch.tanh(jump_direction) * torch.sigmoid(jump_gate) * self.config.jump_scale
         jumped_state = self.jump_norm(no_event_state + jump)
