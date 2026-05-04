@@ -685,10 +685,12 @@ that the rank regularizer helps shape the ordering objective but does not create
 cluster-significant trading claim.
 
 \paragraph{The bridge response is heterogeneous.}
-The supplementary ticker-month atlas in Figure~\ref{fig:event-atlas} shows that bridge transport is
-not a uniform offset applied to all disclosures. Transport magnitude varies across firms and
-months, consistent with event-study evidence that disclosure response depends on the event, firm,
-and market state \citep{beaver1968information,patell1984anticipated,kothari2007econometrics}.
+The bridge-activation ladder in Figure~\ref{fig:bridge-ladder} shows that bridge transport is not a
+uniform offset applied to all disclosures. Rows with larger learned transport are primarily rows
+where the volume-response channel moves more strongly, and the highest-transport deciles also have
+larger realized volume responses. This is consistent with event-study evidence that disclosure
+response depends on the event, firm, and market state
+\citep{beaver1968information,patell1984anticipated,kothari2007econometrics}.
 
 \section{Reproducibility}
 
@@ -767,11 +769,13 @@ signal rather than a large trading-style effect.}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.96\linewidth]{figures/rc_djb_event_calendar_atlas.pdf}
-\caption{Held-out disclosure-response atlas for the most frequent test tickers. Marker area is the
-number of filings in the ticker-month cell and marker color is mean bridge transport, exposing
-heterogeneity across firms and calendar months.}
-\label{fig:event-atlas}
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_bridge_activation_ladder.pdf}
+\caption{Bridge-activation ladder for held-out real 8-K rows. Rows are sorted by RC-DJB response
+transport and grouped into deciles. The upper panel shows that variation in the bridge is carried
+mostly by the volume-response channel, while volatility transport is nearly constant; the lower
+panel reports realized post-filing response magnitudes in sample-standard-deviation units with
+95\% row-bootstrap intervals.}
+\label{fig:bridge-ladder}
 \end{figure}
 
 \begin{figure}[H]

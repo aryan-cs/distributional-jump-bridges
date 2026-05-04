@@ -68,7 +68,7 @@ def main() -> None:
     make_rank_decile_ribbons(output_dir / "rc_djb_rank_decile_ribbons.png")
     make_bridge_delta_ridges(output_dir / "rc_djb_bridge_delta_ridges.png")
     make_firewall_audit(output_dir / "rc_djb_firewall_audit.png")
-    make_event_calendar_atlas(output_dir / "rc_djb_event_calendar_atlas.png")
+    make_bridge_activation_ladder(output_dir / "rc_djb_bridge_activation_ladder.png")
     make_monthly_rank_heatmap(output_dir / "rc_djb_monthly_rank_heatmap.png")
 
 
@@ -1080,95 +1080,210 @@ def make_intervention_story(path: Path) -> None:
     _save(fig, path, dpi=260)
 
 
-def make_event_calendar_atlas(path: Path) -> None:
+def make_bridge_activation_ladder(path: Path) -> None:
     rows = [
         row
         for row in _read_prediction_rows(RCDJB_FULL_PATH)
         if row.get("control_type") == "real_event"
     ]
-    ticker_counts: dict[str, int] = {}
-    for row in rows:
-        ticker_counts[row["ticker"]] = ticker_counts.get(row["ticker"], 0) + 1
-    top_tickers = [
-        ticker
-        for ticker, _ in sorted(
-            ticker_counts.items(),
-            key=lambda item: (-item[1], item[0]),
-        )[:28]
-    ]
-    months = sorted(
-        {
-            str(row["label_start_date"])[:7]
-            for row in rows
-            if row["ticker"] in top_tickers
-        }
-    )
-    month_to_x = {month: idx for idx, month in enumerate(months)}
-    ticker_to_y = {ticker: idx for idx, ticker in enumerate(reversed(top_tickers))}
+    if not rows:
+        raise ValueError("No real-event rows available for bridge activation ladder.")
 
-    grouped: dict[tuple[str, str], list[dict]] = {}
-    for row in rows:
-        ticker = row["ticker"]
-        if ticker not in ticker_to_y:
-            continue
-        month = str(row["label_start_date"])[:7]
-        grouped.setdefault((ticker, month), []).append(row)
-
-    xs, ys, sizes, colors = [], [], [], []
-    for (ticker, month), bucket in grouped.items():
-        xs.append(month_to_x[month])
-        ys.append(ticker_to_y[ticker])
-        count = len(bucket)
-        sizes.append(18 + 34 * count)
-        colors.append(float(np.mean([row["event_delta_abs_mean"] for row in bucket])))
-
-    fig, ax = plt.subplots(figsize=(9.2, 7.0))
-    ax.set_facecolor("#fbfdff")
-    for col in range(len(months)):
-        if col % 2:
-            ax.axvspan(col - 0.5, col + 0.5, color="#f8fafc", zorder=0)
-    cmap = LinearSegmentedColormap.from_list(
-        "calendar_transport",
-        ["#b9c5d2", "#8fb8e9", "#73d997", "#4fbf78", "#2f6f4f"],
+    score = np.asarray(
+        [float(row["event_delta_abs_response_transport"]) for row in rows],
+        dtype=float,
     )
-    scatter = ax.scatter(
-        xs,
-        ys,
-        s=sizes,
-        c=colors,
-        cmap=cmap,
-        edgecolors="#334155",
-        linewidths=0.45,
-        alpha=0.90,
-        zorder=3,
+    order = np.argsort(score)
+    deciles = np.empty_like(order)
+    deciles[order] = np.minimum((np.arange(score.size) * 10) // max(score.size, 1), 9)
+    x = np.arange(1, 11)
+
+    vol_transport = np.asarray(
+        [float(row["event_delta_abs_volatility"]) for row in rows],
+        dtype=float,
     )
-    ax.set_xticks(np.arange(len(months)), months, rotation=35, ha="right", fontsize=7)
-    ax.set_yticks(np.arange(len(top_tickers)), list(reversed(top_tickers)), fontsize=7)
-    ax.set_xlim(-0.65, len(months) - 0.35)
-    ax.set_ylim(-0.7, len(top_tickers) - 0.25)
-    ax.grid(True, color="#e5edf4", linewidth=0.55, zorder=1)
-    ax.set_xlabel("Held-out label-start month")
-    ax.set_ylabel("Ticker")
-    ax.set_title("Held-out disclosure-response atlas", pad=10, fontweight="semibold")
-    colorbar = fig.colorbar(scatter, ax=ax, orientation="vertical", pad=0.015, fraction=0.026)
-    colorbar.set_label(r"Mean bridge transport $|\Delta\mu|$", fontsize=8)
-    colorbar.ax.tick_params(labelsize=7)
-    size_handles = [
-        ax.scatter([], [], s=18 + 34 * count, facecolor="white", edgecolor="#334155", linewidth=0.6)
-        for count in [1, 2, 4]
-    ]
-    ax.legend(
-        size_handles,
-        ["1 filing", "2 filings", "4 filings"],
+    volume_transport = np.asarray(
+        [float(row["event_delta_abs_volume"]) for row in rows],
+        dtype=float,
+    )
+    realized_vol = np.abs(
+        np.asarray([float(row["target_volatility_jump"]) for row in rows], dtype=float)
+    )
+    realized_volume = np.abs(
+        np.asarray([float(row["target_volume_jump"]) for row in rows], dtype=float)
+    )
+    realized_vol = realized_vol / max(float(np.std(realized_vol)), 1e-8)
+    realized_volume = realized_volume / max(float(np.std(realized_volume)), 1e-8)
+
+    def decile_means(values: np.ndarray) -> np.ndarray:
+        return np.asarray([float(np.mean(values[deciles == idx])) for idx in range(10)])
+
+    def decile_ci(values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        means: list[float] = []
+        lows: list[float] = []
+        highs: list[float] = []
+        for idx in range(10):
+            mean, lo, hi = _bootstrap_mean_ci(values[deciles == idx])
+            means.append(mean)
+            lows.append(lo)
+            highs.append(hi)
+        return np.asarray(means), np.asarray(lows), np.asarray(highs)
+
+    vol_means = decile_means(vol_transport)
+    volume_means = decile_means(volume_transport)
+    counts = np.asarray([int(np.sum(deciles == idx)) for idx in range(10)])
+    vol_response, vol_low, vol_high = decile_ci(realized_vol)
+    volume_response, volume_low, volume_high = decile_ci(realized_volume)
+
+    fig = plt.figure(figsize=(9.2, 6.2))
+    grid = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.05], hspace=0.30)
+    ax_transport = fig.add_subplot(grid[0])
+    ax_response = fig.add_subplot(grid[1], sharex=ax_transport)
+
+    for ax in [ax_transport, ax_response]:
+        ax.set_facecolor("#fbfdff")
+        ax.grid(True, axis="y", color="#e5edf4", linewidth=0.7)
+        ax.set_xlim(0.35, 10.65)
+        for spine in ax.spines.values():
+            spine.set_color("#8091a5")
+
+    vol_floor = float(np.min(vol_means))
+    vol_ceiling = float(np.max(vol_means))
+    ax_transport.fill_between(
+        [0.55, 10.45],
+        [vol_floor, vol_floor],
+        [vol_ceiling, vol_ceiling],
+        color="#77b0e4",
+        alpha=0.18,
+        linewidth=0.0,
+        label=r"Volatility shift range $|\Delta\mu_\sigma|$",
+    )
+    ax_transport.plot(
+        x,
+        vol_means,
+        color="#4f82d6",
+        linewidth=1.7,
+        marker="o",
+        markersize=3.2,
+        markeredgecolor="#242424",
+        markeredgewidth=0.45,
+        label=r"Volatility shift mean",
+    )
+    ax_transport.bar(
+        x,
+        volume_means,
+        width=0.72,
+        color="#6ed49a",
+        edgecolor="#334155",
+        linewidth=0.55,
+        label=r"Volume shift $|\Delta\mu_V|$",
+    )
+    ax_transport.axhline(0.0, color="#8091a5", linewidth=0.9)
+    ax_transport.set_ylabel("Mean bridge\ntransport")
+    ax_transport.set_title(
+        "Bridge activation ladder across held-out real 8-K rows",
+        pad=10,
+        fontweight="semibold",
+    )
+    ax_transport.annotate(
+        "",
+        xy=(10.0, 0.96),
+        xytext=(1.0, 0.96),
+        xycoords=("data", "axes fraction"),
+        textcoords=("data", "axes fraction"),
+        arrowprops={"arrowstyle": "->", "linewidth": 1.1, "color": "#8091a5"},
+    )
+    ax_transport.text(
+        5.5,
+        0.985,
+        "Rows sorted from weakest to strongest response transport",
+        transform=ax_transport.get_xaxis_transform(),
+        ha="center",
+        va="bottom",
+        fontsize=8,
+        color="#334155",
+    )
+    ax_transport.text(
+        1.0,
+        float(np.mean(vol_means)) * 1.04,
+        "volatility channel is nearly flat",
+        ha="left",
+        va="bottom",
+        fontsize=7.4,
+        color="#334155",
+    )
+    ymax = max(float(np.max(vol_means)), float(np.max(volume_means)))
+    for idx, count in enumerate(counts, start=1):
+        ax_transport.text(
+            idx,
+            ymax * 1.18,
+            f"n={count}",
+            ha="center",
+            va="bottom",
+            fontsize=6.8,
+            color="#64748b",
+        )
+    ax_transport.set_ylim(0.0, ymax * 1.34)
+    ax_transport.legend(
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.16),
+        bbox_to_anchor=(0.5, -0.13),
         ncol=3,
         frameon=False,
-        fontsize=8,
-        title="Cell count",
-        title_fontsize=8,
+        fontsize=7.8,
     )
-    fig.subplots_adjust(bottom=0.23, top=0.92, left=0.10, right=0.90)
+
+    response_specs = [
+        (
+            volume_response,
+            volume_low,
+            volume_high,
+            "#4fbf78",
+            "Realized volume response",
+        ),
+        (
+            vol_response,
+            vol_low,
+            vol_high,
+            "#4f82d6",
+            "Realized volatility response",
+        ),
+    ]
+    for means, lows, highs, color, label in response_specs:
+        yerr = np.vstack([means - lows, highs - means])
+        ax_response.errorbar(
+            x,
+            means,
+            yerr=yerr,
+            color=color,
+            linewidth=1.8,
+            marker="o",
+            markersize=4.2,
+            markeredgecolor="#242424",
+            markeredgewidth=0.55,
+            capsize=3,
+            label=label,
+        )
+    ax_response.set_ylabel("Mean absolute realized\nresponse, SD units")
+    ax_response.set_xlabel("Bridge response-transport decile")
+    ax_response.set_xticks(x, [str(idx) for idx in x])
+    ax_response.legend(
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.24),
+        ncol=2,
+        frameon=False,
+        fontsize=8,
+    )
+    fig.text(
+        0.51,
+        0.02,
+        "Return-mean transport is fixed at zero by the RC-DJB firewall; "
+        "the ladder isolates the risk and liquidity channels.",
+        ha="center",
+        va="center",
+        fontsize=8,
+        color="#334155",
+    )
+    fig.subplots_adjust(bottom=0.18, top=0.93, left=0.11, right=0.98)
     _save(fig, path, dpi=260)
 
 
