@@ -80,16 +80,21 @@ SEC_USER_AGENT="CEBT academic research <name> <email>" uv run python scripts/10_
 uv run python scripts/20_download_prices.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
 uv run python scripts/30_build_features.py --config configs/paper_v3.yaml --output-dir data/processed/paper_v3
 uv run python scripts/60_ablate.py --config configs/paper_v3.yaml --output-dir data/runs/paper_v3
-uv run python scripts/40_train.py --config configs/paper_v3_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_ejssm
-uv run python scripts/50_eval.py --config configs/paper_v3_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_ejssm
+uv run python scripts/40_train.py --config configs/paper_v3_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_ejssm_textjump
+uv run python scripts/50_eval.py --config configs/paper_v3_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_ejssm_textjump
+uv run python scripts/50_eval.py --config configs/paper_v3_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_ejssm_textjump --intervention no_jump
+uv run python scripts/50_eval.py --config configs/paper_v3_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_ejssm_textjump --intervention zero_event
+uv run python scripts/50_eval.py --config configs/paper_v3_ejssm.yaml --model-name ejssm --output-dir data/runs/paper_v3_ejssm_textjump --intervention shuffle_event
 uv run python scripts/70_make_tables.py --config configs/paper_v3.yaml --output-dir data/runs/paper_v3
 ```
 
 The current paper-scale run uses 7,236 real SEC 8-K events, 7,236 matched no-event controls, and
-2,463 held-out rows. The draft reports that EJSSM improves calibrated event-response regression;
-it does not claim to solve abnormal-return ranking.
+2,463 held-out rows. The draft reports that EJSSM improves event-response MSE and passes
+no-jump, zero-disclosure, and shuffled-disclosure MSE stress tests; it does not claim to solve
+abnormal-return ranking or to dominate every probabilistic-likelihood ablation.
 
-The current draft lives at `paper/main.tex`, with figures in `paper/figures/` and table exports in `paper/tables/`.
+The current draft lives at `paper/main.tex`, the compiled PDF is `paper/main.pdf`, figures are in
+`paper/figures/`, and table exports are in `paper/tables/`.
 
 ## Data Policy
 

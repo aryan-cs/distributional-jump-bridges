@@ -49,8 +49,11 @@ and 2,463 held-out rows from 98 large U.S. firms, EJSSM reduces held-out multi-t
 0.0597 for concat fusion to 0.0551. The paired row-bootstrap improvement over concat fusion is
 0.0046 with 95\% interval [0.0018, 0.0078]. EJSSM also produces near-nominal 95\% Gaussian
 coverage (0.947 observed) and separates real disclosures from matched controls in latent jump
-magnitude (0.0887 vs. 0.0513). The architecture does not improve abnormal-return rank IC; its
-contribution is calibrated event-response modeling, not trading-signal ranking.
+magnitude (0.0887 vs. 0.0513). Intervention tests show that removing the jump, zeroing disclosure
+text, or shuffling disclosure text raises event-row MSE by 0.0306, 0.0071, and 0.0178,
+respectively, with positive paired intervals. The architecture does not improve abnormal-return
+rank IC and does not dominate every likelihood ablation; its contribution is event-response
+state modeling, not trading-signal ranking.
 \end{abstract}
 
 \section{Introduction}
@@ -224,7 +227,9 @@ Gaussian response distribution.
 Confidence intervals use 1,000 percentile bootstrap resamples for standalone metrics and 5,000
 row-paired bootstrap resamples for paired MSE comparisons. Ticker-clustered intervals resample
 tickers with replacement. Rank IC is Spearman correlation between predicted and realized
-abnormal return over held-out rows.
+abnormal return over held-out rows. We also evaluate three EJSSM interventions on the same
+checkpoint: setting \(j_i=0\), replacing disclosure embeddings with zero vectors, and shuffling
+disclosure embeddings across held-out rows.
 
 \begin{table}[H]
 \centering
@@ -283,12 +288,57 @@ Mean event delta, controls & 0.0277 \\
 \end{tabular}
 \end{table}
 
+\begin{table}[H]
+\centering
+\caption{EJSSM intervention tests on held-out rows. Lower MSE and NLL are better. Jump AUC tests
+whether latent jump magnitude separates real 8-K rows from matched no-event controls.}
+\label{tab:interventions}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+Variant & All MSE & Event MSE & Event NLL & Rank IC & Jump AUC \\
+\midrule
+Full EJSSM & \textbf{0.0551} & \textbf{0.0825} & -2.1203 & 0.0028 & \textbf{0.9623} \\
+No jump & 0.0697 & 0.1131 & -2.1117 & 0.0375 & 0.5000 \\
+Zero disclosure & 0.0586 & 0.0896 & \textbf{-2.1369} & 0.0370 & 0.5000 \\
+Shuffled disclosure & 0.0650 & 0.1002 & -2.0120 & \textbf{0.0488} & 0.5107 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Paired event-row MSE stress tests. Positive values mean full EJSSM has lower MSE than
+the intervention.}
+\label{tab:intervention-paired}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Intervention & MSE increase & 95\% paired CI & 95\% ticker-clustered CI \\
+\midrule
+No jump & 0.0306 & [0.0236, 0.0373] & [0.0222, 0.0381] \\
+Zero disclosure & 0.0071 & [0.0016, 0.0133] & [0.0014, 0.0132] \\
+Shuffled disclosure & 0.0178 & [0.0105, 0.0259] & [0.0104, 0.0257] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.86\linewidth]{figures/ejssm_mse_comparison.png}
 \caption{Held-out MSE with ticker-clustered bootstrap intervals. EJSSM has the best point estimate
 and improves significantly over the strongest fusion baselines under paired row resampling.}
 \label{fig:mse}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figures/ejssm_intervention_stress.png}
+\caption{Intervention stress test. Full EJSSM has the lowest event-row MSE, but zero-disclosure
+has slightly better event-row Gaussian NLL and shuffled disclosure has higher rank IC. The ridge
+panel shows that aligned disclosure text creates a strong event/control jump separation, whereas
+zeroing or shuffling the disclosure channel collapses this separation.}
+\label{fig:interventions}
 \end{figure}
 
 \begin{figure}[H]
@@ -330,16 +380,27 @@ controls. Mean absolute event delta is 0.0578 for real 8-K rows and 0.0277 for c
 gaps support the interpretation that the model uses its jump channel differently when a public
 filing is present.
 
+\paragraph{Interventions support a narrow mechanism claim.}
+Setting the latent jump to zero raises event-row MSE by 0.0306 with interval [0.0236, 0.0373].
+Zeroing disclosure text raises event-row MSE by 0.0071 with interval [0.0016, 0.0133], and
+shuffling disclosure text raises it by 0.0178 with interval [0.0105, 0.0259]. These results show
+that aligned disclosure-conditioned jumps help squared-error response prediction. They do not
+show that the jump norm estimates realized event magnitude: in held-out real 8-K rows, jump
+magnitude is not positively rank-correlated with absolute abnormal return or volatility jump.
+
 \paragraph{The probabilistic head is useful but imperfect.}
 The 95\% Gaussian interval has observed coverage 0.9475, close to nominal. The 80\% interval has
 coverage 0.8586, indicating conservative uncertainty at narrower intervals. This suggests that
 the model captures broad event-response dispersion better than fine-grained conditional variance.
+However, zeroing disclosure text slightly improves event-row Gaussian NLL while worsening MSE,
+so likelihood calibration and point accuracy are not aligned in this architecture.
 
 \paragraph{EJSSM does not solve event ranking.}
 The abnormal-return rank IC for EJSSM is 0.0027 with ticker-clustered interval
 [-0.0410, 0.0431]. CEBT remains the only tested model with positive clustered rank-IC interval.
-Thus, the main EJSSM result is calibrated response regression and latent jump separation, not
-cross-sectional return ranking.
+Shuffled disclosure also has higher EJSSM rank IC than the aligned full model. Thus, the main
+EJSSM result is response regression and latent jump separation, not cross-sectional return
+ranking.
 
 \section{Reproducibility}
 
@@ -355,9 +416,12 @@ inputs.
 
 The study has several limitations. The disclosure encoder is a deterministic hashing baseline
 rather than a pretrained financial language model. The jump generator excludes event/control
-metadata, but controls still use zero event embeddings, so stronger placebo-text controls remain
-necessary. The price source is public daily data rather than CRSP or intraday trades and quotes.
-The universe is large-cap biased and may
+metadata, but controls still use zero event embeddings, so stronger placebo-text controls and
+within-time shuffles remain necessary. The intervention results show that point MSE, likelihood,
+and ranking can move in different directions; EJSSM should therefore be interpreted as a
+state-structured response regressor rather than a complete probabilistic or alpha-ranking model.
+The price source is public daily data rather than CRSP or intraday trades and quotes. The universe
+is large-cap biased and may
 contain survivorship effects, ticker-history issues, and 8-K item-mix sensitivity. Abnormal returns
 are SPY-adjusted rather than factor-model residuals. EJSSM improves event-response MSE but does not
 produce a statistically reliable abnormal-return ranking signal. The jump interpretation is
@@ -375,8 +439,11 @@ EJSSM models disclosures as bounded jumps in latent market dynamics. On a real S
 this state-space formulation significantly improves held-out multi-target event-response MSE over
 concat fusion, DOT, CEBT, text-only, and no-event baselines. It also produces near-nominal 95\%
 predictive coverage and separates real disclosures from matched controls through jump magnitude.
-The architecture does not improve abnormal-return rank IC, so the result should be read as a
-contribution to calibrated event-response modeling rather than trading-signal discovery.
+No-jump, zero-disclosure, and shuffled-disclosure interventions all worsen event-row MSE, which
+supports the architectural value of aligned disclosure-conditioned jumps. The architecture does
+not improve abnormal-return rank IC and is not uniformly best under Gaussian NLL, so the result
+should be read as a contribution to event-response state modeling rather than trading-signal
+discovery.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
