@@ -53,7 +53,7 @@ COLOR_MODELS = {
     "dot": "#58dced",
     "ejssm_bge": "#5891ed",
     "djb": "#edd258",
-    "rc_djb": "#58ed8a",
+    "rc_djb": "#48c978",
 }
 
 
@@ -465,7 +465,7 @@ def make_data_temporal_audit(path: Path) -> None:
         x,
         events,
         controls,
-        colors=["#58ed8a", "#5891ed"],
+        colors=["#48c978", "#5891ed"],
         alpha=0.92,
         labels=["Real 8-K rows", "Matched controls"],
     )
@@ -506,7 +506,7 @@ def make_data_temporal_audit(path: Path) -> None:
     ax.set_facecolor("#fbfdff")
     ax.grid(True, axis="x", color="#e5edf4", linewidth=0.7, zorder=1)
     gap_palette = {
-        1: "#58ed8a",
+        1: "#48c978",
         2: "#a978ed",
         3: "#5891ed",
         4: "#edd258",
@@ -614,7 +614,7 @@ def make_bridge_vector_field(path: Path) -> None:
     hist, x_edges, y_edges = np.histogram2d(x_real, y_real, bins=42, range=[xlim, ylim])
     cmap = LinearSegmentedColormap.from_list(
         "transport_density",
-        ["#fbfdff", "#d5f0e7", "#58ed8a", "#58ed8a"],
+        ["#fbfdff", "#d5f0e7", "#48c978", "#48c978"],
     )
     ax.imshow(
         hist.T,
@@ -696,7 +696,7 @@ def make_bridge_vector_field(path: Path) -> None:
     ax.set_title("Disclosure bridge transport field", pad=12, fontweight="semibold")
     ax.legend(
         handles=[
-            Patch(facecolor="#58ed8a", edgecolor="none", label="Real 8-K density"),
+            Patch(facecolor="#48c978", edgecolor="none", label="Real 8-K density"),
             Line2D(
                 [0],
                 [0],
@@ -731,7 +731,7 @@ def make_rank_decile_ribbons(path: Path) -> None:
         "CEBT": "#a978ed",
         "EJSSM-BGE": "#5891ed",
         "DJB": "#edd258",
-        "RC-DJB": "#58ed8a",
+        "RC-DJB": "#48c978",
     }
     fig, ax = plt.subplots(figsize=(8.8, 5.0))
     ax.set_facecolor("#fbfdff")
@@ -835,7 +835,7 @@ def make_bridge_delta_ridges(path: Path) -> None:
         real, controls = values_by_variant[label]
         for values, color, alpha, line_color in [
             (controls, "#5891ed", 0.66, "#4b7bbb"),
-            (real, "#58ed8a", 0.72, "#242424"),
+            (real, "#48c978", 0.72, "#242424"),
         ]:
             hist, _ = np.histogram(values, bins=bins)
             if hist.max() > 0:
@@ -873,7 +873,7 @@ def make_bridge_delta_ridges(path: Path) -> None:
     )
     ax.legend(
         handles=[
-            Patch(facecolor="#58ed8a", edgecolor="none", alpha=0.78, label="Real 8-K rows"),
+            Patch(facecolor="#48c978", edgecolor="none", alpha=0.78, label="Real 8-K rows"),
             Patch(facecolor="#5891ed", edgecolor="none", alpha=0.78, label="Matched controls"),
             Line2D([0], [0], color="#334155", linewidth=1.0, label="Within-row median"),
         ],
@@ -981,7 +981,7 @@ def make_intervention_story(path: Path) -> None:
         "shuffled_text": "Shuffled text",
     }
     pastel = {
-        "full": "#58ed8a",
+        "full": "#48c978",
         "no_bridge": "#9fb3bc",
         "zero_text": "#ed5871",
         "shuffled_text": "#a978ed",
@@ -1048,7 +1048,7 @@ def make_intervention_story(path: Path) -> None:
         x - width / 2,
         real,
         width,
-        color="#58ed8a",
+        color="#48c978",
         edgecolor="#242424",
         linewidth=0.6,
         label="Real 8-K rows",
@@ -1130,7 +1130,7 @@ def make_event_calendar_atlas(path: Path) -> None:
             ax.axvspan(col - 0.5, col + 0.5, color="#f8fafc", zorder=0)
     cmap = LinearSegmentedColormap.from_list(
         "calendar_transport",
-        ["#d5dde8", "#bfe3ee", "#58ed8a", "#58ed8a", "#242424"],
+        ["#d5dde8", "#bfe3ee", "#48c978", "#48c978", "#242424"],
     )
     scatter = ax.scatter(
         xs,
@@ -1208,7 +1208,7 @@ def make_monthly_rank_heatmap(path: Path) -> None:
 
     cmap = LinearSegmentedColormap.from_list(
         "pastel_rank_ic",
-        ["#ed5871", "#ffe1e7", "#f8fafc", "#d9fbe3", "#58ed8a"],
+        ["#ed5871", "#ffe1e7", "#f8fafc", "#d9fbe3", "#48c978"],
     )
     fig, ax = plt.subplots(figsize=(8.8, 3.8))
     masked = np.ma.masked_invalid(matrix)

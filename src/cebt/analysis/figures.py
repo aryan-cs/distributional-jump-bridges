@@ -215,7 +215,7 @@ def _plot_prediction_scatter(predictions: list[dict], figure_dir: Path) -> Path:
     y = [row["target_abnormal_return"] for row in rows]
     path = figure_dir / "prediction_scatter.png"
     plt.figure(figsize=(5.5, 5.0))
-    plt.scatter(x, y, s=24, alpha=0.75, color="#58ed8a")
+    plt.scatter(x, y, s=24, alpha=0.75, color="#48c978")
     plt.axhline(0.0, color="black", linewidth=0.8)
     plt.axvline(0.0, color="black", linewidth=0.8)
     plt.xlabel("Predicted abnormal return")
@@ -339,7 +339,7 @@ def _plot_residual_distribution(predictions: list[dict], figure_dir: Path) -> Pa
         density=True,
         alpha=0.65,
         label="True 8-K events",
-        color="#58ed8a",
+        color="#48c978",
     )
     plt.hist(
         control_values,
