@@ -16,10 +16,11 @@ def main() -> None:
     args = parse_args("Build CEBT features")
     config = load_run_config(args.config)
     out = output_dir(args, "data/processed/pilot")
-    events = read_jsonl(out / "events.jsonl")
-    price_rows = read_jsonl(out / "prices.jsonl")
+    source_out = _feature_source_dir(config) or out
+    events = read_jsonl(source_out / "events.jsonl")
+    price_rows = read_jsonl(source_out / "prices.jsonl")
     if not events or not price_rows:
-        raise SystemExit("Missing events.jsonl or prices.jsonl")
+        raise SystemExit(f"Missing events.jsonl or prices.jsonl in {source_out}")
     prices_by_ticker = {}
     for row in price_rows:
         bar = PriceBar.from_dict(row)
@@ -31,6 +32,11 @@ def main() -> None:
     factor_rows = _load_or_fetch_factors(config, out)
     bundle = build_feature_bundle(events, prices_by_ticker, market_bars, config, out, factor_rows)
     print(f"Wrote feature bundle with {bundle.x_pre.shape[0]} rows to {out / 'features.npz'}")
+
+
+def _feature_source_dir(config: dict[str, Any]) -> Path | None:
+    source = config.get("features", {}).get("source_processed_dir")
+    return resolve_path(source) if source else None
 
 
 def _load_or_fetch_factors(config: dict[str, Any], out: Path) -> list:

@@ -15,6 +15,9 @@ labels:
 model:
   config_path: "configs/model/djb_bge_small.yaml"
 
+features:
+  source_processed_dir: "data/processed/paper_v3_bge"
+
 training:
   epochs: 18
   batch_size: 64
