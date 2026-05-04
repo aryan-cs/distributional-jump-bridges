@@ -42,7 +42,9 @@ def evaluate_model(
     if len(dataset) == 0:
         dataset = CEBTTensorDataset(feature_path, split=1)
     loader = DataLoader(dataset, batch_size=int(config.get("training", {}).get("batch_size", 32)))
-    predictions, targets, deltas, is_event, dataset_indices = _predict(model, loader, device)
+    predictions, targets, deltas, latents, outcome_logvars, is_event, dataset_indices = _predict(
+        model, loader, device
+    )
     metadata_rows = read_jsonl(metadata_path)
     source_rows = [
         metadata_rows[source_idx] if source_idx < len(metadata_rows) else {}
@@ -66,6 +68,8 @@ def evaluate_model(
         "calibration_error": calibration_error(predictions[:, 0], targets[:, 0]),
         "mean_abs_event_delta_true_events": _masked_abs_mean(deltas, is_event >= 0.5),
         "mean_abs_event_delta_controls": _masked_abs_mean(deltas, is_event < 0.5),
+        "mean_abs_latent_event_true_events": _masked_abs_mean(latents, is_event >= 0.5),
+        "mean_abs_latent_event_controls": _masked_abs_mean(latents, is_event < 0.5),
         "mse_ci": bootstrap_ci(
             paired_values,
             _mse_from_paired_rows(targets.shape[1]),
@@ -107,6 +111,8 @@ def evaluate_model(
             seed=int(config.get("seed", 7)) + 104,
         ),
     }
+    if outcome_logvars is not None:
+        metrics.update(_probabilistic_metrics(predictions, targets, outcome_logvars))
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     write_json(output / f"{checkpoint.get('model_name', 'model')}_eval_metrics.json", metrics)
@@ -123,8 +129,21 @@ def evaluate_model(
                 "target_volatility_jump": float(targets[local_idx, 1]),
                 "target_volume_jump": float(targets[local_idx, 2]),
                 "event_delta_abs_mean": float(np.mean(np.abs(deltas[local_idx]))),
+                "latent_event_abs_mean": float(np.mean(np.abs(latents[local_idx]))),
             }
         )
+        if outcome_logvars is not None:
+            row = prediction_rows[-1]
+            row["prediction_logvar_abnormal_return"] = float(outcome_logvars[local_idx, 0])
+            row["prediction_logvar_volatility_jump"] = float(outcome_logvars[local_idx, 1])
+            row["prediction_logvar_volume_jump"] = float(outcome_logvars[local_idx, 2])
+            row["prediction_gaussian_nll"] = float(
+                _row_gaussian_nll(
+                    predictions[local_idx],
+                    targets[local_idx],
+                    outcome_logvars[local_idx],
+                )
+            )
     prediction_path = output / f"{checkpoint.get('model_name', 'model')}_predictions.jsonl"
     write_jsonl(prediction_path, prediction_rows)
     return metrics
@@ -134,11 +153,21 @@ def _predict(
     model: torch.nn.Module,
     loader: DataLoader,
     device: torch.device,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray | None,
+    np.ndarray,
+    np.ndarray,
+]:
     model.eval()
     predictions = []
     targets = []
     deltas = []
+    latents = []
+    outcome_logvars = []
     is_event = []
     indices = []
     with torch.no_grad():
@@ -149,6 +178,9 @@ def _predict(
             outputs = model(x_pre, event_embedding, metadata)
             predictions.append(outputs["prediction"].detach().cpu().numpy())
             deltas.append(outputs["event_delta"].detach().cpu().numpy())
+            latents.append(outputs["z_event"].detach().cpu().numpy())
+            if "outcome_logvar" in outputs:
+                outcome_logvars.append(outputs["outcome_logvar"].detach().cpu().numpy())
             targets.append(batch["y"].numpy())
             is_event.append(batch["is_event"].numpy())
             indices.append(batch["index"].numpy())
@@ -156,6 +188,8 @@ def _predict(
         np.concatenate(predictions, axis=0),
         np.concatenate(targets, axis=0),
         np.concatenate(deltas, axis=0),
+        np.concatenate(latents, axis=0),
+        np.concatenate(outcome_logvars, axis=0) if outcome_logvars else None,
         np.concatenate(is_event, axis=0),
         np.concatenate(indices, axis=0),
     )
@@ -172,3 +206,26 @@ def _mse_from_paired_rows(target_dim: int):
         return mse(rows[:, :target_dim], rows[:, target_dim:])
 
     return metric
+
+
+def _row_gaussian_nll(
+    prediction: np.ndarray,
+    target: np.ndarray,
+    logvar: np.ndarray,
+) -> float:
+    return float(0.5 * np.mean(np.exp(-logvar) * (target - prediction) ** 2 + logvar))
+
+
+def _probabilistic_metrics(
+    predictions: np.ndarray,
+    targets: np.ndarray,
+    logvars: np.ndarray,
+) -> dict[str, float]:
+    std = np.sqrt(np.exp(logvars))
+    errors = np.abs(targets - predictions)
+    return {
+        "gaussian_nll": _row_gaussian_nll(predictions, targets, logvars),
+        "gaussian_80_coverage": float(np.mean(errors <= 1.281551565545 * std)),
+        "gaussian_95_coverage": float(np.mean(errors <= 1.959963984540 * std)),
+        "mean_predictive_std": float(np.mean(std)),
+    }
