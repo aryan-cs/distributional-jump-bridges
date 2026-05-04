@@ -59,3 +59,14 @@ def test_training_smoke_completes_on_tiny_tensor_bundle(tmp_path) -> None:
         split=1,
     )
     assert metrics["rows"] == 4
+    zero_metrics = evaluate_model(
+        config,
+        feature_path,
+        metadata_path,
+        tmp_path / "cebt.pt",
+        tmp_path,
+        split=1,
+        intervention="zero_event",
+    )
+    assert zero_metrics["rows"] == 4
+    assert (tmp_path / "cebt_zero_event_eval_metrics.json").exists()

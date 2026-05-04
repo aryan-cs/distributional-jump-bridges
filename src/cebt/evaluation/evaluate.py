@@ -33,7 +33,7 @@ def evaluate_model(
     split: int = 2,
     intervention: str = "full",
 ) -> dict[str, Any]:
-    if intervention not in {"full", "no_jump", "shuffle_event"}:
+    if intervention not in {"full", "no_jump", "shuffle_event", "zero_event"}:
         raise ValueError(f"Unknown intervention: {intervention}")
     validate_feature_metadata(metadata_path)
     device = auto_device()
@@ -199,6 +199,8 @@ def _predict(
             batch_size = int(event_embedding.shape[0])
             if shuffled_embeddings is not None:
                 event_embedding = shuffled_embeddings[cursor : cursor + batch_size].to(device)
+            if intervention == "zero_event":
+                event_embedding = torch.zeros_like(event_embedding)
             cursor += batch_size
             metadata = batch["metadata"].to(device)
             outputs = _forward_model(model, x_pre, event_embedding, metadata, intervention)
