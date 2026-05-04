@@ -58,8 +58,10 @@ def main() -> None:
 def _set_style() -> None:
     plt.rcParams.update(
         {
-            "font.family": "DejaVu Sans",
-            "mathtext.fontset": "dejavusans",
+            "font.family": "serif",
+            "font.serif": ["cmr10"],
+            "mathtext.fontset": "cm",
+            "axes.formatter.use_mathtext": True,
             "axes.linewidth": 0.8,
             "axes.edgecolor": "#334155",
             "axes.labelcolor": "#1f2937",
@@ -67,11 +69,15 @@ def _set_style() -> None:
             "ytick.color": "#374151",
             "figure.facecolor": "white",
             "savefig.facecolor": "white",
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
         }
     )
 
 
 def _save(fig: plt.Figure, path: Path, *, dpi: int = 240) -> None:
+    if path.suffix.lower() != ".pdf":
+        fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight", pad_inches=0.08)
     fig.savefig(path, dpi=dpi, bbox_inches="tight", pad_inches=0.08)
     plt.close(fig)
 
@@ -238,7 +244,6 @@ def make_architecture_figure(path: Path) -> None:
     arrow((0.825, 0.360), (rail_x, 0.360), color=palette["line"], lw=1.20)
     arrow((rail_x, rail_mid), (0.890, rail_mid), color=palette["line"], lw=1.20)
 
-    fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight", pad_inches=0.08)
     _save(fig, path, dpi=240)
 
 
