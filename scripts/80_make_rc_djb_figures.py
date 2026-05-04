@@ -1187,15 +1187,15 @@ def make_bridge_activation_ladder(path: Path) -> None:
     )
     ax_transport.annotate(
         "",
-        xy=(10.0, 0.96),
-        xytext=(1.0, 0.96),
+        xy=(10.0, 0.93),
+        xytext=(1.0, 0.93),
         xycoords=("data", "axes fraction"),
         textcoords=("data", "axes fraction"),
         arrowprops={"arrowstyle": "->", "linewidth": 1.1, "color": "#8091a5"},
     )
     ax_transport.text(
         5.5,
-        0.985,
+        0.945,
         "Weak to strong bridge transport",
         transform=ax_transport.get_xaxis_transform(),
         ha="center",
