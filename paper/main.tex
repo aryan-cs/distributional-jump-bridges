@@ -45,15 +45,15 @@ ordinary continuation, and SEC filing text generates a bounded latent jump befor
 event-response head predicts abnormal return, volatility jump, and volume jump. In the main
 variant, the jump generator receives disclosure text but not event/control indicator metadata. On
 a leakage-controlled public-data study with 7,236 SEC 8-K events, 7,236 matched no-event controls,
-and 2,463 held-out rows from 98 large U.S. firms, EJSSM reduces held-out multi-target MSE from
-0.0597 for concat fusion to 0.0551. The paired row-bootstrap improvement over concat fusion is
-0.0046 with 95\% interval [0.0018, 0.0078]. EJSSM also produces near-nominal 95\% Gaussian
-coverage (0.947 observed) and separates real disclosures from matched controls in latent jump
-magnitude (0.0887 vs. 0.0513). Intervention tests show that removing the jump, zeroing disclosure
-text, or shuffling disclosure text raises event-row MSE by 0.0306, 0.0071, and 0.0178,
-respectively, with positive paired intervals. The architecture does not improve abnormal-return
-rank IC and does not dominate every likelihood ablation; its contribution is event-response
-state modeling, not trading-signal ranking.
+and 2,463 held-out rows from 98 large U.S. firms, a BGE-embedded EJSSM reduces held-out
+multi-target MSE from 0.0597 for concat fusion to 0.0547. The paired row-bootstrap improvement
+over concat fusion is 0.0050 with 95\% interval [0.0034, 0.0067]. Relative to the deterministic
+hashing EJSSM, BGE-EJSSM gives a small, non-significant MSE improvement but a significant Gaussian
+NLL improvement of 0.0709 with 95\% interval [0.0357, 0.1153]. Intervention tests show that
+removing the jump, zeroing disclosure text, or shuffling disclosure text raises event-row MSE by
+0.0096, 0.0092, and 0.0128, respectively, with positive paired intervals. The architecture still
+does not solve abnormal-return ranking; its contribution is event-response state modeling, not
+trading-signal discovery.
 \end{abstract}
 
 \section{Introduction}
@@ -123,9 +123,11 @@ head.}
 
 \paragraph{Inputs and targets.}
 Each sample \(i\) has a label start date \(\tau_i\), a 40-trading-day pre-event tensor
-\(X_i \in \mathbb{R}^{40 \times 8}\), a disclosure embedding \(e_i \in \mathbb{R}^{256}\), metadata
+\(X_i \in \mathbb{R}^{40 \times 8}\), a disclosure embedding \(e_i\), metadata
 \(m_i \in \mathbb{R}^{6}\), and target vector \(y_i \in \mathbb{R}^{3}\). The targets are
-five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump.
+five-trading-day SPY-adjusted return, realized-volatility jump, and volume jump. We report both a
+deterministic hashing encoder and a chunk-pooled BGE-small encoder \citep{xiao2023cpack}; the
+headline BGE variant uses 384-dimensional disclosure embeddings.
 
 \paragraph{No-event state transition.}
 A recurrent encoder maps the pre-event sequence to a latent state:
@@ -157,20 +159,23 @@ EJSSM predicts a diagonal Gaussian response distribution:
     p_\theta(y_i \mid X_i,e_i,m_i) =
     \mathcal{N}\left(\mu_\theta(s_i^+,m_i),\mathrm{diag}(\exp(\ell_\theta(s_i^+,m_i)))\right).
 \end{equation}
-The reported point prediction is \(\mu_\theta\). The training loss combines MSE, Gaussian negative
-log likelihood, control residual suppression, jump sparsity, residual consistency, and a small
-pairwise ranking regularizer over real disclosure rows:
+The reported point prediction is \(\mu_\theta\). The main BGE run combines a
+target-standardized Huber supervised loss, Gaussian negative log likelihood, control residual
+suppression, jump sparsity, residual consistency, and a small pairwise ranking regularizer over
+real disclosure rows:
 \begin{equation}
 \mathcal{L} =
-\lambda_y\lVert \mu_\theta-y\rVert_2^2
+\lambda_y\mathcal{L}_{Huber}(D_y^{-1}(\mu_\theta-y);w_y)
 +\lambda_n\mathcal{L}_{NLL}
 +\lambda_c\mathbb{1}_{control}\lVert\Delta_i\rVert_2^2
 +\lambda_s\lVert j_i\rVert_1
 +\lambda_v\mathrm{Var}(\Delta_i)
 +\lambda_r\mathcal{L}_{rank}.
 \end{equation}
-The main run uses \(\lambda_y=1.0\), \(\lambda_n=0.05\), \(\lambda_c=0.25\),
-\(\lambda_s=0.001\), \(\lambda_v=0.05\), and \(\lambda_r=0.05\).
+where \(D_y\) is computed from the training targets and \(w_y=(3.0,1.0,0.25)\) emphasizes
+abnormal return relative to volume jumps. The main run uses \(\lambda_y=1.0\),
+\(\lambda_n=0.05\), \(\lambda_c=0.25\), \(\lambda_s=0.001\), \(\lambda_v=0.05\), and
+\(\lambda_r=0.15\).
 
 \section{Data and Leakage Controls}
 
@@ -212,17 +217,19 @@ Held-out rows & 2,463 \\
 
 \section{Experiments}
 
-Rows with \(\tau_i \leq\) 2023-12-31 are training rows, rows with
-\(\tau_i \leq\) 2024-12-31 are validation rows, and later rows are held out. This yields 9,729
-training rows, 2,280 validation rows, and 2,463 held-out rows across 98 held-out tickers and 13
-held-out label-start months. Models are trained for 15 epochs with AdamW, learning rate
-\(10^{-3}\), weight decay \(10^{-4}\), batch size 64, fixed seed 29, and no hyperparameter search.
+Rows with \(\tau_i \leq\) 2023-12-31 are training rows, rows from 2024 are validation rows, and
+later rows are held out. This yields 9,729 training rows, 2,280 validation rows, and 2,463 held-out
+rows across 98 held-out tickers and 13 held-out label-start months. Deterministic-hash baselines
+are trained for 15 epochs; the BGE-EJSSM run is trained for 18 epochs. All runs use AdamW, learning
+rate \(10^{-3}\), weight decay \(10^{-4}\), batch size 64, and fixed seed 29.
 
 Baselines include no-event dynamics, text-only MLP, concat fusion, Counterfactual Event Bottleneck
 Transformer (CEBT), and Disclosure Operator Transformer (DOT). CEBT is an additive stochastic
 bottleneck baseline. DOT generates a low-rank latent operator from disclosure text. EJSSM differs
 by modeling the event as a bounded jump in a no-event state-space transition and by predicting a
-Gaussian response distribution.
+Gaussian response distribution. The BGE-EJSSM variant uses chunk-pooled BGE-small disclosure
+embeddings and a target-standardized Huber objective with additional abnormal-return weighting;
+the hashing EJSSM uses the same architecture with deterministic hashed text features.
 
 Confidence intervals use 1,000 percentile bootstrap resamples for standalone metrics and 5,000
 row-paired bootstrap resamples for paired MSE comparisons. Ticker-clustered intervals resample
@@ -246,7 +253,8 @@ Text-only & 0.0643 & [0.0495, 0.0844] & -0.0009 & [-0.0456, 0.0434] \\
 Concat fusion & 0.0597 & [0.0442, 0.0817] & -0.0182 & [-0.0597, 0.0267] \\
 CEBT & 0.0660 & [0.0488, 0.0898] & \textbf{0.0463} & [0.0052, 0.0893] \\
 DOT & 0.0596 & [0.0449, 0.0804] & -0.0131 & [-0.0510, 0.0291] \\
-EJSSM & \textbf{0.0551} & [0.0412, 0.0748] & 0.0027 & [-0.0410, 0.0431] \\
+EJSSM-hash & 0.0551 & [0.0412, 0.0748] & 0.0027 & [-0.0410, 0.0431] \\
+EJSSM-BGE & \textbf{0.0547} & [0.0395, 0.0764] & 0.0099 & [-0.0329, 0.0556] \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -259,11 +267,12 @@ EJSSM & \textbf{0.0551} & [0.0412, 0.0748] & 0.0027 & [-0.0410, 0.0431] \\
 \toprule
 Baseline & Baseline--EJSSM MSE & 95\% paired CI \\
 \midrule
-No-event & 0.01449 & [0.00981, 0.01990] \\
-Text-only & 0.00919 & [0.00614, 0.01239] \\
-Concat fusion & 0.00460 & [0.00180, 0.00775] \\
-CEBT & 0.01090 & [0.00713, 0.01528] \\
-DOT & 0.00450 & [0.00191, 0.00724] \\
+No-event & 0.01493 & [0.01218, 0.01814] \\
+Text-only & 0.00963 & [0.00746, 0.01187] \\
+Concat fusion & 0.00504 & [0.00339, 0.00672] \\
+CEBT & 0.01134 & [0.00899, 0.01395] \\
+DOT & 0.00494 & [0.00296, 0.00695] \\
+EJSSM-hash & 0.00044 & [-0.00248, 0.00304] \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -276,14 +285,14 @@ DOT & 0.00450 & [0.00191, 0.00724] \\
 \toprule
 Diagnostic & Value \\
 \midrule
-Gaussian NLL & -2.2130 \\
-Observed 80\% interval coverage & 0.8586 \\
-Observed 95\% interval coverage & 0.9475 \\
-Mean predictive standard deviation & 0.1117 \\
-Mean latent jump, real 8-Ks & 0.0887 \\
-Mean latent jump, controls & 0.0513 \\
-Mean event delta, real 8-Ks & 0.0578 \\
-Mean event delta, controls & 0.0277 \\
+Gaussian NLL & -2.2839 \\
+Observed 80\% interval coverage & 0.8921 \\
+Observed 95\% interval coverage & 0.9594 \\
+Mean predictive standard deviation & 0.1362 \\
+Mean latent jump, real 8-Ks & 0.0485 \\
+Mean latent jump, controls & 0.0426 \\
+Mean event delta, real 8-Ks & 0.0403 \\
+Mean event delta, controls & 0.0125 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -298,10 +307,10 @@ whether latent jump magnitude separates real 8-K rows from matched no-event cont
 \toprule
 Variant & All MSE & Event MSE & Event NLL & Rank IC & Jump AUC \\
 \midrule
-Full EJSSM & \textbf{0.0551} & \textbf{0.0825} & -2.1203 & 0.0028 & \textbf{0.9623} \\
-No jump & 0.0697 & 0.1131 & -2.1117 & 0.0375 & 0.5000 \\
-Zero disclosure & 0.0586 & 0.0896 & \textbf{-2.1369} & 0.0370 & 0.5000 \\
-Shuffled disclosure & 0.0650 & 0.1002 & -2.0120 & \textbf{0.0488} & 0.5107 \\
+Full EJSSM-BGE & \textbf{0.0547} & \textbf{0.0831} & \textbf{-2.2215} & 0.0099 & \textbf{0.7236} \\
+No jump & 0.0600 & 0.0926 & -2.1829 & -0.0028 & 0.5000 \\
+Zero disclosure & 0.0591 & 0.0922 & -2.1795 & -0.0031 & 0.5000 \\
+Shuffled disclosure & 0.0621 & 0.0959 & -2.1602 & -0.0209 & 0.5254 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -316,9 +325,9 @@ the intervention.}
 \toprule
 Intervention & MSE increase & 95\% paired CI & 95\% ticker-clustered CI \\
 \midrule
-No jump & 0.0306 & [0.0236, 0.0373] & [0.0222, 0.0381] \\
-Zero disclosure & 0.0071 & [0.0016, 0.0133] & [0.0014, 0.0132] \\
-Shuffled disclosure & 0.0178 & [0.0105, 0.0259] & [0.0104, 0.0257] \\
+No jump & 0.0096 & [0.0064, 0.0131] & [0.0057, 0.0141] \\
+Zero disclosure & 0.0092 & [0.0062, 0.0124] & [0.0056, 0.0133] \\
+Shuffled disclosure & 0.0128 & [0.0088, 0.0170] & [0.0084, 0.0178] \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -334,10 +343,10 @@ and improves significantly over the strongest fusion baselines under paired row 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{figures/ejssm_intervention_stress.png}
-\caption{Intervention stress test. Full EJSSM has the lowest event-row MSE, but zero-disclosure
-has slightly better event-row Gaussian NLL and shuffled disclosure has higher rank IC. The ridge
-panel shows that aligned disclosure text creates a strong event/control jump separation, whereas
-zeroing or shuffling the disclosure channel collapses this separation.}
+\caption{Intervention stress test. Full EJSSM has the lowest event-row MSE and Gaussian NLL among
+the tested BGE interventions. The ridge panel shows that aligned disclosure text creates an
+event/control jump separation, whereas zeroing the disclosure channel or removing the jump
+collapses this separation and shuffling text weakens it.}
 \label{fig:interventions}
 \end{figure}
 
@@ -369,38 +378,37 @@ realized-return dispersion, which explains the weak rank-IC result.}
 \section{Findings}
 
 \paragraph{Latent jumps improve event-response regression.}
-EJSSM has held-out MSE 0.0551, compared with 0.0597 for concat fusion and 0.0596 for DOT. The
-paired MSE improvement over concat fusion is 0.0046 with interval [0.0018, 0.0078], and the
-improvement over DOT is 0.0045 with interval [0.0019, 0.0072]. The event-only MSE is also lower:
-0.0825 for EJSSM versus 0.0907 for concat fusion on held-out real 8-K rows.
+BGE-EJSSM has held-out MSE 0.0547, compared with 0.0597 for concat fusion and 0.0596 for DOT. The
+paired MSE improvement over concat fusion is 0.0050 with interval [0.0034, 0.0067], and the
+improvement over DOT is 0.0049 with interval [0.0030, 0.0070]. Relative to the hashing EJSSM, the
+MSE improvement is small and not significant: 0.0004 with interval [-0.0025, 0.0030].
 
 \paragraph{The learned jump channel is active on real disclosures.}
-Mean absolute latent jump magnitude is 0.0887 for real 8-K rows and 0.0513 for matched no-event
-controls. Mean absolute event delta is 0.0578 for real 8-K rows and 0.0277 for controls. These
+Mean absolute latent jump magnitude is 0.0485 for real 8-K rows and 0.0426 for matched no-event
+controls. Mean absolute event delta is 0.0403 for real 8-K rows and 0.0125 for controls. These
 gaps support the interpretation that the model uses its jump channel differently when a public
 filing is present.
 
 \paragraph{Interventions support a narrow mechanism claim.}
-Setting the latent jump to zero raises event-row MSE by 0.0306 with interval [0.0236, 0.0373].
-Zeroing disclosure text raises event-row MSE by 0.0071 with interval [0.0016, 0.0133], and
-shuffling disclosure text raises it by 0.0178 with interval [0.0105, 0.0259]. These results show
+Setting the latent jump to zero raises event-row MSE by 0.0096 with interval [0.0064, 0.0131].
+Zeroing disclosure text raises event-row MSE by 0.0092 with interval [0.0062, 0.0124], and
+shuffling disclosure text raises it by 0.0128 with interval [0.0088, 0.0170]. These results show
 that aligned disclosure-conditioned jumps help squared-error response prediction. They do not
 show that the jump norm estimates realized event magnitude: in held-out real 8-K rows, jump
 magnitude is not positively rank-correlated with absolute abnormal return or volatility jump.
 
 \paragraph{The probabilistic head is useful but imperfect.}
-The 95\% Gaussian interval has observed coverage 0.9475, close to nominal. The 80\% interval has
-coverage 0.8586, indicating conservative uncertainty at narrower intervals. This suggests that
-the model captures broad event-response dispersion better than fine-grained conditional variance.
-However, zeroing disclosure text slightly improves event-row Gaussian NLL while worsening MSE,
-so likelihood calibration and point accuracy are not aligned in this architecture.
+The 95\% Gaussian interval has observed coverage 0.9594, slightly above nominal. The 80\%
+interval has coverage 0.8921, indicating conservative uncertainty at narrower intervals. BGE-EJSSM
+substantially improves Gaussian NLL over the hashing EJSSM: the paired NLL improvement is 0.0709
+with interval [0.0357, 0.1153]. This is the clearest gain from replacing hashing with an open
+pretrained disclosure encoder.
 
 \paragraph{EJSSM does not solve event ranking.}
-The abnormal-return rank IC for EJSSM is 0.0027 with ticker-clustered interval
-[-0.0410, 0.0431]. CEBT remains the only tested model with positive clustered rank-IC interval.
-Shuffled disclosure also has higher EJSSM rank IC than the aligned full model. Thus, the main
-EJSSM result is response regression and latent jump separation, not cross-sectional return
-ranking.
+The abnormal-return rank IC for BGE-EJSSM is 0.0099 with ticker-clustered interval
+[-0.0329, 0.0556]. CEBT remains the only tested model with positive clustered rank-IC interval.
+Thus, the main EJSSM result is response regression, distributional calibration, and intervention
+sensitivity, not cross-sectional return ranking.
 
 \section{Reproducibility}
 
@@ -414,14 +422,14 @@ inputs.
 
 \section{Limitations}
 
-The study has several limitations. The disclosure encoder is a deterministic hashing baseline
-rather than a pretrained financial language model. The jump generator excludes event/control
-metadata, but controls still use zero event embeddings, so stronger placebo-text controls and
-within-time shuffles remain necessary. The intervention results show that point MSE, likelihood,
-and ranking can move in different directions; EJSSM should therefore be interpreted as a
-state-structured response regressor rather than a complete probabilistic or alpha-ranking model.
-The price source is public daily data rather than CRSP or intraday trades and quotes. The universe
-is large-cap biased and may
+The study has several limitations. BGE-small is an open general-purpose encoder rather than a
+financial-domain encoder, and SEC filings are represented by chunk mean pooling rather than a
+trained long-document model. The jump generator excludes event/control metadata, but controls
+still use zero event embeddings, so stronger placebo-text controls and within-time shuffles remain
+necessary. The intervention results show that point MSE, likelihood, and ranking can move in
+different directions; EJSSM should therefore be interpreted as a state-structured response
+regressor rather than a complete probabilistic or alpha-ranking model. The price source is public
+daily data rather than CRSP or intraday trades and quotes. The universe is large-cap biased and may
 contain survivorship effects, ticker-history issues, and 8-K item-mix sensitivity. Abnormal returns
 are SPY-adjusted rather than factor-model residuals. EJSSM improves event-response MSE but does not
 produce a statistically reliable abnormal-return ranking signal. The jump interpretation is
@@ -436,14 +444,14 @@ independent reproduction, and falsification of the empirical claims.
 \section{Conclusion}
 
 EJSSM models disclosures as bounded jumps in latent market dynamics. On a real SEC 8-K experiment,
-this state-space formulation significantly improves held-out multi-target event-response MSE over
-concat fusion, DOT, CEBT, text-only, and no-event baselines. It also produces near-nominal 95\%
-predictive coverage and separates real disclosures from matched controls through jump magnitude.
-No-jump, zero-disclosure, and shuffled-disclosure interventions all worsen event-row MSE, which
-supports the architectural value of aligned disclosure-conditioned jumps. The architecture does
-not improve abnormal-return rank IC and is not uniformly best under Gaussian NLL, so the result
-should be read as a contribution to event-response state modeling rather than trading-signal
-discovery.
+this state-space formulation improves held-out multi-target event-response MSE over concat fusion,
+DOT, CEBT, text-only, and no-event baselines. Replacing deterministic hashed text features with
+chunk-pooled BGE embeddings yields the strongest overall MSE and a significant Gaussian NLL
+improvement over the hashing EJSSM. No-jump, zero-disclosure, and shuffled-disclosure
+interventions all worsen event-row MSE, which supports the architectural value of aligned
+disclosure-conditioned jumps. The architecture does not produce a statistically reliable
+abnormal-return rank signal, so the result should be read as a contribution to event-response
+state modeling rather than trading-signal discovery.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
