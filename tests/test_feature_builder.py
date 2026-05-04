@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 
 from cebt.data.prices import PriceBar
-from cebt.features.build import build_feature_bundle, validate_feature_rows
+from cebt.features.build import _compound_market_return, build_feature_bundle, validate_feature_rows
+from cebt.utils.time import TradingCalendar
 
 
 def test_feature_builder_rejects_leaky_rows() -> None:
@@ -57,6 +58,22 @@ def test_feature_bundle_builds_real_events_and_controls(tmp_path) -> None:
     assert {row["control_type"] for row in bundle.rows} == {"real_event", "same_ticker_no_event"}
     assert all(row["feature_max_date"] < row["label_start_date"] for row in bundle.rows)
     assert np.all(np.isfinite(bundle.y))
+
+
+def test_market_forward_return_excludes_label_start_close_return() -> None:
+    days = (date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 4), date(2024, 1, 5))
+    calendar = TradingCalendar(days)
+    market_returns = {
+        days[0]: 0.50,
+        days[1]: 0.10,
+        days[2]: -0.05,
+        days[3]: 0.02,
+    }
+
+    observed = _compound_market_return(days[0], days[3], market_returns, calendar)
+    expected = (1.10 * 0.95 * 1.02) - 1.0
+
+    assert observed == pytest.approx(expected)
 
 
 def _bars(ticker: str, start: date, count: int) -> list[PriceBar]:

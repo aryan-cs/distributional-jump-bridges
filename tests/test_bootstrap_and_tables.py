@@ -5,7 +5,7 @@ import csv
 import numpy as np
 
 from cebt.analysis.tables import make_tables
-from cebt.evaluation.bootstrap import clustered_bootstrap_ci
+from cebt.evaluation.bootstrap import clustered_bootstrap_ci, leave_one_group_out
 from cebt.utils.io import write_json, write_jsonl
 
 
@@ -24,6 +24,19 @@ def test_clustered_bootstrap_reports_group_count() -> None:
     assert interval["groups"] == 2
     assert interval["mean"] == 0.5
     assert interval["lo"] <= interval["mean"] <= interval["hi"]
+
+
+def test_leave_one_group_out_reports_extreme_groups() -> None:
+    values = np.asarray([[1.0], [2.0], [3.0], [100.0]])
+    groups = np.asarray(["a", "a", "b", "c"], dtype=object)
+
+    result = leave_one_group_out(values, groups, lambda rows: float(np.mean(rows[:, 0])))
+
+    assert result["groups"] == 3
+    assert result["full"] == 26.5
+    assert result["min_group"] == "c"
+    assert result["max_group"] == "a"
+    assert result["min"] < result["full"] < result["max"]
 
 
 def test_make_tables_writes_paired_rank_ic_table(tmp_path) -> None:

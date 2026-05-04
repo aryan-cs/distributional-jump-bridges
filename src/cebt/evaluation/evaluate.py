@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from cebt.evaluation.bootstrap import bootstrap_ci, clustered_bootstrap_ci
+from cebt.evaluation.bootstrap import bootstrap_ci, clustered_bootstrap_ci, leave_one_group_out
 from cebt.evaluation.leakage import validate_feature_metadata
 from cebt.evaluation.metrics import (
     abnormal_return_spread,
@@ -48,7 +48,17 @@ def evaluate_model(
     shuffled_embeddings = (
         _shuffled_embeddings(dataset, config) if intervention == "shuffle_event" else None
     )
-    predictions, targets, deltas, latents, outcome_logvars, is_event, dataset_indices = _predict(
+    (
+        predictions,
+        targets,
+        deltas,
+        latents,
+        outcome_logvars,
+        base_logvars,
+        logvar_deltas,
+        is_event,
+        dataset_indices,
+    ) = _predict(
         model,
         loader,
         device,
@@ -113,6 +123,11 @@ def evaluate_model(
             n_boot=1000,
             seed=int(config.get("seed", 7)) + 102,
         ),
+        "rank_ic_leave_one_ticker_out": leave_one_group_out(
+            rank_values,
+            ticker_groups,
+            lambda rows: rank_ic(rows[:, 0], rows[:, 1]) or 0.0,
+        ),
         "mse_ci_month_cluster": clustered_bootstrap_ci(
             paired_values,
             month_groups,
@@ -130,6 +145,16 @@ def evaluate_model(
     }
     if outcome_logvars is not None:
         metrics.update(_probabilistic_metrics(predictions, targets, outcome_logvars, is_event))
+        metrics.update(
+            _return_logvar_diagnostics(
+                predictions,
+                targets,
+                outcome_logvars,
+                base_logvars,
+                logvar_deltas,
+                is_event,
+            )
+        )
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     output_stem = _output_stem(checkpoint.get("model_name", "model"), intervention)
@@ -163,6 +188,10 @@ def evaluate_model(
                     outcome_logvars[local_idx],
                 )
             )
+            if base_logvars is not None:
+                row["base_logvar_abnormal_return"] = float(base_logvars[local_idx, 0])
+            if logvar_deltas is not None:
+                row["delta_logvar_abnormal_return"] = float(logvar_deltas[local_idx, 0])
     prediction_path = output / f"{output_stem}_predictions.jsonl"
     write_jsonl(prediction_path, prediction_rows)
     return metrics
@@ -180,6 +209,8 @@ def _predict(
     np.ndarray,
     np.ndarray,
     np.ndarray | None,
+    np.ndarray | None,
+    np.ndarray | None,
     np.ndarray,
     np.ndarray,
 ]:
@@ -189,6 +220,8 @@ def _predict(
     deltas = []
     latents = []
     outcome_logvars = []
+    base_logvars = []
+    logvar_deltas = []
     is_event = []
     indices = []
     cursor = 0
@@ -209,6 +242,10 @@ def _predict(
             latents.append(outputs["z_event"].detach().cpu().numpy())
             if "outcome_logvar" in outputs:
                 outcome_logvars.append(outputs["outcome_logvar"].detach().cpu().numpy())
+            if "base_logvar" in outputs:
+                base_logvars.append(outputs["base_logvar"].detach().cpu().numpy())
+            if "logvar_delta" in outputs:
+                logvar_deltas.append(outputs["logvar_delta"].detach().cpu().numpy())
             targets.append(batch["y"].numpy())
             is_event.append(batch["is_event"].numpy())
             indices.append(batch["index"].numpy())
@@ -218,6 +255,8 @@ def _predict(
         np.concatenate(deltas, axis=0),
         np.concatenate(latents, axis=0),
         np.concatenate(outcome_logvars, axis=0) if outcome_logvars else None,
+        np.concatenate(base_logvars, axis=0) if base_logvars else None,
+        np.concatenate(logvar_deltas, axis=0) if logvar_deltas else None,
         np.concatenate(is_event, axis=0),
         np.concatenate(indices, axis=0),
     )
@@ -341,6 +380,44 @@ def _probabilistic_metrics(
         "event_mean_predictive_std": _masked_predictive_std(logvars, event_mask),
         "control_mean_predictive_std": _masked_predictive_std(logvars, control_mask),
     }
+
+
+def _return_logvar_diagnostics(
+    predictions: np.ndarray,
+    targets: np.ndarray,
+    logvars: np.ndarray,
+    base_logvars: np.ndarray | None,
+    logvar_deltas: np.ndarray | None,
+    is_event: np.ndarray,
+) -> dict[str, float | None]:
+    return_logvar = logvars[:, 0]
+    abnormal_target = targets[:, 0]
+    abnormal_error = np.abs(abnormal_target - predictions[:, 0])
+    event_mask = is_event >= 0.5
+    control_mask = is_event < 0.5
+    metrics: dict[str, float | None] = {
+        "return_logvar_signed_rank_ic": rank_ic(return_logvar, abnormal_target),
+        "return_logvar_abs_error_rank_ic": rank_ic(return_logvar, abnormal_error),
+    }
+    if base_logvars is not None:
+        metrics["base_return_logvar_signed_rank_ic"] = rank_ic(base_logvars[:, 0], abnormal_target)
+    if logvar_deltas is not None:
+        return_delta = logvar_deltas[:, 0]
+        metrics.update(
+            {
+                "return_logvar_delta_signed_rank_ic": rank_ic(return_delta, abnormal_target),
+                "return_logvar_delta_abs_error_rank_ic": rank_ic(return_delta, abnormal_error),
+                "mean_abs_return_logvar_delta_true_events": _masked_abs_mean(
+                    return_delta.reshape(-1, 1),
+                    event_mask,
+                ),
+                "mean_abs_return_logvar_delta_controls": _masked_abs_mean(
+                    return_delta.reshape(-1, 1),
+                    control_mask,
+                ),
+            }
+        )
+    return metrics
 
 
 def _masked_gaussian_nll(

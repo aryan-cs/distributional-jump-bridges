@@ -55,7 +55,7 @@ def write_csv(path: str | Path, rows: Iterable[dict[str, Any]]) -> Path:
         return output
     fields = sorted({key for row in materialized for key in row})
     with output.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(materialized)
     return output

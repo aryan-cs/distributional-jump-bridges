@@ -162,7 +162,8 @@ Let \(P_{i,t}\), \(V_{i,t}\), and \(r_{i,t}\) denote adjusted close, volume, and
 for firm \(i\), and let \(r^M_t\) denote the SPY return. The label window
 \(\mathcal{W}_i=\{\tau_i,\ldots,\eta_i\}\) starts on the disclosure date for before-close traded-day
 filings and on the next traded date otherwise; \(\eta_i\) is the fifth tradable session in the
-window. The pre-window
+window. Let \(\mathcal{R}_i=\mathcal{W}_i\setminus\{\tau_i\}\) denote the close-to-close return
+dates strictly after the label-start close. The pre-window
 \(\mathcal{P}_i\) is the 20 traded sessions strictly before \(\tau_i\). These choices follow the
 event-study convention that features must precede the public event time while outcomes are measured
 only after the event window begins \citep{brown1985eventstudies,mackinlay1997eventstudies,
@@ -172,7 +173,7 @@ implemented targets are
 \begin{align}
     y_{i,r}
     &= \frac{P_{i,\eta_i}}{P_{i,\tau_i}} - 1
-    - \left(\prod_{t\in\mathcal{W}_i}(1+r^M_t)-1\right),\\
+    - \left(\prod_{t\in\mathcal{R}_i}(1+r^M_t)-1\right),\\
     y_{i,\sigma}
     &= \operatorname{sd}_{t\in\mathcal{W}_i}(r_{i,t})
     - \operatorname{sd}_{t\in\mathcal{P}_i}(r_{i,t}),\\
@@ -285,7 +286,7 @@ suppression, bottleneck regularization, bridge sparsity, residual consistency, a
 \end{equation}
 Here \(z_i\) is the stored disclosure-bridge latent used for sparsity diagnostics. The main run
 uses \(w_y=(3.0,1.0,0.25)\), \(\lambda_n=0.10\), \(\lambda_c=0.35\),
-\(\lambda_{KL}=0.01\), \(\lambda_s=0.001\), \(\lambda_v=0.05\), and \(\lambda_r=0.15\).
+\(\lambda_{KL}=0.0\), \(\lambda_s=0.001\), \(\lambda_v=0.05\), and \(\lambda_r=0.15\).
 
 \section{Data and Leakage Controls}
 
@@ -349,7 +350,9 @@ hyndman2021forecasting,lopezdeprado2018advances}.
 
 Baselines include no-event dynamics, text-only MLP, concat fusion, Counterfactual Event Bottleneck
 Transformer (CEBT), Disclosure Operator Transformer (DOT), Event-Jump State Space Model (EJSSM),
-and an unconstrained Distributional Jump Bridge (DJB). Confidence intervals use percentile
+and an unconstrained Distributional Jump Bridge (DJB). The No-event baseline is trained on the same
+chronological event/control rows and event-window labels as the other models; it removes disclosure
+text rather than changing the training substrate. Confidence intervals use percentile
 bootstrap resampling; ticker-clustered intervals resample tickers with replacement
 \citep{efron1979bootstrap,efron1993introduction,davison1997bootstrap,cameron2008bootstrap,
 cameron2015practitioner}. Paired comparisons use row-paired bootstrap resampling. Rank IC is
@@ -622,7 +625,7 @@ pre-event market state is intrinsically anti-predictive. That baseline must expl
 disclosure-window returns, volatility, and volume using only ordinary market history and metadata.
 RC-DJB instead trains its no-event state jointly with a disclosure bridge, control penalty,
 likelihood term, and rank objective. The bridge absorbs event-response variation in volatility,
-volume, and uncertainty, while the return firewall prevents high-dimensional text from directly
+volume, and uncertainty, while the return-mean firewall prevents high-dimensional text from directly
 rewriting the abnormal-return mean. The empirical claim is therefore not that an isolated no-event
 forecaster is sufficient; it is that a jointly trained no-event return anchor is useful when
 disclosure text is routed through response-distribution transport.
@@ -641,7 +644,7 @@ predictions are invariant under bridge interventions while volatility and volume
 EJSSM-BGE and unconstrained DJB achieve lower point MSE than RC-DJB, but their rank IC intervals
 include zero. RC-DJB is therefore not a universal winner; it is a Pareto-frontier point that
 prioritizes statistically reliable ranking while keeping response error below fusion baselines.
-This tradeoff is the main empirical evidence for the return firewall.
+This tradeoff is the main empirical evidence for the return-mean firewall.
 
 \paragraph{The likelihood result is competitive but not decisive.}
 RC-DJB has Gaussian NLL -2.2864, close to EJSSM-BGE's -2.2839. The paired NLL difference against
@@ -682,7 +685,7 @@ isolates the routing architecture rather than encoder scale. Rank IC is statisti
 economically small; net performance after spreads, commissions, market impact, borrow constraints,
 capacity, and turnover requires a separate portfolio-construction study
 \citep{grinold2000active,novymarx2016taxonomy,frazzini2018trading,lopezdeprado2018advances}. The
-return firewall is an architectural and predictive constraint, not structural causal identification
+return-mean firewall is an architectural and predictive constraint, not structural causal identification
 \citep{rubin1974estimating,imbens2015causal}.
 
 \section{Ethics and Use}

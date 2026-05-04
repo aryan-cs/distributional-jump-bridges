@@ -488,13 +488,25 @@ def _compound_market_return(
     market_returns: dict[date, float],
     calendar: TradingCalendar,
 ) -> float:
+    """Compound market close-to-close returns aligned with ``P_end / P_start``.
+
+    A price return from the start close to the end close contains the daily market returns strictly
+    after ``start`` through ``end``. Including the close-to-close return stamped on ``start`` would
+    subtract market movement from the previous close to the start close without a corresponding
+    stock-price term in the numerator.
+    """
+
+    if start >= end:
+        return 0.0
     total = 1.0
     observed = 0
-    current = start
+    current = calendar.strictly_next_trading_day(start)
     while current <= end:
         if current in market_returns:
             total *= 1.0 + market_returns[current]
             observed += 1
+        if current == end:
+            break
         current = calendar.strictly_next_trading_day(current)
     return 0.0 if observed == 0 else total - 1.0
 
