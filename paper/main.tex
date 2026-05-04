@@ -298,7 +298,8 @@ same-ticker no-event control is constructed for each filing, excluding dates wit
 blackout window around known events. The no-lookahead rule and blackout controls are motivated by
 standard event-study design and known financial backtesting leakage failure modes
 \citep{mackinlay1997eventstudies,white2000reality,hansen2005spa,bailey2014probability,
-lopezdeprado2018advances,li2025profitmirage}.
+lopezdeprado2018advances,li2025profitmirage}. Figure~\ref{fig:data-temporal-audit} visualizes
+the chronological sample and the feature-to-label guard margin used by every row.
 
 \begin{table}[H]
 \centering
@@ -317,6 +318,15 @@ Held-out rows & 2,463 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_data_temporal_audit.pdf}
+\caption{Chronological data substrate and feature-label leakage audit. The upper panel shows
+monthly real-event and matched-control rows with chronological split boundaries; the lower panel
+shows that every row's latest feature date precedes its label-start date.}
+\label{fig:data-temporal-audit}
+\end{figure}
 
 \section{Experiments}
 
@@ -517,6 +527,15 @@ Shuffled text & 0.0081 & [0.0051, 0.0117] \\
 
 \begin{figure}[H]
 \centering
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_firewall_audit.pdf}
+\caption{Return firewall audit. Points show mean absolute prediction change from full RC-DJB under
+bridge interventions, with 95\% row-bootstrap intervals. The abnormal-return prediction remains
+exactly invariant while response targets move.}
+\label{fig:firewall-audit}
+\end{figure}
+
+\begin{figure}[H]
+\centering
 \includegraphics[width=0.94\linewidth]{figures/rc_djb_pareto_frontier.pdf}
 \caption{RC-DJB occupies a different point on the response/ranking tradeoff: EJSSM and DJB have
 lower point MSE, while RC-DJB is the only tested low-error model with a strictly positive
@@ -526,11 +545,47 @@ ticker-clustered rank-IC interval.}
 
 \begin{figure}[H]
 \centering
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_bridge_vector_field.pdf}
+\caption{Held-out response-state transport induced by the disclosure bridge. The background shows
+real 8-K density in the no-bridge volatility/volume response plane, blue points show matched
+controls, and arrows show binned mean shifts in volatility-jump and volume-jump predictions.}
+\label{fig:bridge-field}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_rank_decile_ribbons.pdf}
+\caption{Predicted abnormal-return decile profiles on held-out real 8-K rows. Lines show realized
+five-day abnormal-return means; ribbons are 95\% row-bootstrap confidence intervals computed within
+each predicted decile.}
+\label{fig:rank-deciles}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_bridge_delta_ridges.pdf}
+\caption{Response-transport fingerprints under bridge interventions. Ridge densities compare
+mean absolute response transport for real disclosure rows and matched controls; vertical marks show
+within-row medians.}
+\label{fig:bridge-ridges}
+\end{figure}
+
+\begin{figure}[H]
+\centering
 \includegraphics[width=0.92\linewidth]{figures/rc_djb_intervention_story.pdf}
 \caption{Interventions show that the disclosure bridge matters for event-response error. Rank IC
 does not move under text interventions because the return-mean firewall prevents direct
 text-to-return overwriting.}
 \label{fig:interventions}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\linewidth]{figures/rc_djb_event_calendar_atlas.pdf}
+\caption{Held-out disclosure-response atlas for the most frequent test tickers. Marker area is the
+number of filings in the ticker-month cell and marker color is mean bridge transport, exposing
+heterogeneity across firms and calendar months.}
+\label{fig:event-atlas}
 \end{figure}
 
 \begin{figure}[H]
@@ -548,13 +603,19 @@ event-mean transport baselines.}
 \paragraph{Return-mean conservation recovers rank signal.}
 RC-DJB obtains rank IC 0.0546 with ticker-clustered interval [0.0104, 0.0948]. In contrast,
 concat fusion, DOT, EJSSM-BGE, and unconstrained DJB all have rank intervals crossing zero. CEBT
-also has positive rank IC, but its MSE is much worse than RC-DJB.
+also has positive rank IC, but its MSE is much worse than RC-DJB. The decile profiles in
+Figure~\ref{fig:rank-deciles} show that this signal is uneven and noisy, rather than a monotone
+large-effect ranking curve.
 
 \paragraph{The bridge improves response modeling without moving return means.}
 RC-DJB improves paired MSE over concat fusion by 0.0043 and over DOT by 0.0042. Removing the bridge
 raises event-row MSE by 0.0066; zeroing or shuffling text raises event-row MSE by 0.0049 and
 0.0081. These changes occur even though abnormal-return predictions are unchanged by construction,
 which means the bridge is acting through volatility, volume, and uncertainty transport.
+Figures~\ref{fig:bridge-field} and~\ref{fig:bridge-ridges} visualize the same mechanism: disclosure
+text changes response-distribution coordinates while matched controls remain closer to zero
+transport. Figure~\ref{fig:firewall-audit} audits the architectural constraint directly: return
+predictions are invariant under bridge interventions while volatility and volume predictions move.
 
 \paragraph{There is a real response/ranking tradeoff.}
 EJSSM-BGE and unconstrained DJB achieve lower point MSE than RC-DJB, but their rank IC intervals
@@ -567,6 +628,12 @@ RC-DJB has Gaussian NLL -2.2864, close to EJSSM-BGE's -2.2839. The paired NLL di
 EJSSM-BGE is small and not statistically decisive. The likelihood evidence supports the bridge as
 competitive; the distinctive result is the combination of positive rank IC and response-error
 improvement over fusion baselines.
+
+\paragraph{The bridge response is heterogeneous.}
+The ticker-month atlas in Figure~\ref{fig:event-atlas} shows that bridge transport is not a uniform
+offset applied to all disclosures. Transport magnitude varies across firms and months, consistent
+with event-study evidence that disclosure response depends on the event, firm, and market state
+\citep{beaver1968information,patell1984anticipated,kothari2007econometrics}.
 
 \section{Reproducibility}
 
