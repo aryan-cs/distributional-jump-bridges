@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -66,6 +67,9 @@ def train_model(
     amp_enabled = bool(training.get("amp", True)) and device.type == "cuda"
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
     history = []
+    best_state = None
+    best_epoch = None
+    best_val_loss = float("inf")
     for epoch in range(int(training.get("epochs", 3))):
         model.train()
         train_metrics = []
@@ -105,14 +109,26 @@ def train_model(
                 "val": val_metrics,
             }
         )
+        selection_loss = val_metrics.get("loss") if val_metrics else history[-1]["train"]["loss"]
+        if selection_loss < best_val_loss:
+            best_val_loss = float(selection_loss)
+            best_epoch = epoch + 1
+            best_state = deepcopy(model.state_dict())
+    selected_state = (
+        best_state
+        if bool(training.get("save_best", True)) and best_state
+        else model.state_dict()
+    )
     checkpoint = {
         "model_name": model_name,
         "model_config": model_config.__dict__,
         "loss_config": loss_weights.__dict__,
         "target_mean": target_mean.detach().cpu().tolist() if target_mean is not None else None,
         "target_std": target_std.detach().cpu().tolist() if target_std is not None else None,
-        "state_dict": model.state_dict(),
+        "state_dict": selected_state,
         "history": history,
+        "selected_epoch": best_epoch if bool(training.get("save_best", True)) else len(history),
+        "selected_val_loss": best_val_loss if bool(training.get("save_best", True)) else None,
     }
     checkpoint_path = run_dir / f"{model_name}.pt"
     torch.save(checkpoint, checkpoint_path)
@@ -123,6 +139,8 @@ def train_model(
         "device": str(device),
         "train_rows": len(train_ds),
         "val_rows": len(val_ds),
+        "selected_epoch": checkpoint["selected_epoch"],
+        "selected_val_loss": checkpoint["selected_val_loss"],
         "history": history,
     }
     write_json(run_dir / f"{model_name}_train_summary.json", summary)
