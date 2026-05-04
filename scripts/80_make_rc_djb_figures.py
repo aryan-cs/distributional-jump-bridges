@@ -101,7 +101,7 @@ def _save(fig: plt.Figure, path: Path, *, dpi: int = 240) -> None:
 
 
 def make_architecture_figure(path: Path) -> None:
-    fig, ax = plt.subplots(figsize=(11.2, 4.8))
+    fig, ax = plt.subplots(figsize=(7.2, 6.4))
     ax.set_axis_off()
     ax.set_xlim(0.0, 1.0)
     ax.set_ylim(0.0, 1.0)
@@ -135,7 +135,7 @@ def make_architecture_figure(path: Path) -> None:
             (x, y),
             w,
             h,
-            boxstyle="round,pad=0.012,rounding_size=0.014",
+            boxstyle="round,pad=0.006,rounding_size=0.012",
             facecolor=face,
             edgecolor=edge or palette["ink"],
             linewidth=1.15,
@@ -203,98 +203,134 @@ def make_architecture_figure(path: Path) -> None:
         )
         ax.add_patch(patch)
 
-    ax.text(0.155, 0.90, "Inputs", fontsize=9.0, color=palette["muted"], ha="center")
-    ax.text(0.435, 0.91, "Encoders", fontsize=9.0, color=palette["muted"], ha="center")
+    ax.text(0.275, 0.940, "Market stream", fontsize=9.0, color=palette["muted"], ha="center")
     ax.text(
         0.725,
-        0.91,
-        "Transport constraints",
+        0.940,
+        "Disclosure stream",
         fontsize=9.0,
         color=palette["muted"],
         ha="center",
     )
-    ax.text(0.935, 0.91, "Output", fontsize=9.0, color=palette["muted"], ha="center")
+    stage_labels = [
+        ("Inputs", 0.835),
+        ("Encoders", 0.625),
+        ("Transport", 0.415),
+        ("Output", 0.190),
+    ]
+    for label, y in stage_labels:
+        ax.text(
+            0.075,
+            y,
+            label,
+            fontsize=8.6,
+            color=palette["muted"],
+            ha="right",
+            va="center",
+        )
 
-    box((0.055, 0.690), (0.205, 0.130), "Pre-event market state", r"$X_{<t}$", palette["input"])
-    box((0.055, 0.295), (0.205, 0.130), "SEC 8-K disclosure", r"$e_t$", "#fffbe6")
+    left_x = 0.135
+    right_x = 0.550
+    box_w = 0.315
+    box_h = 0.092
+    y_input = 0.795
+    y_encoder = 0.590
+    y_transport = 0.385
+    y_output = 0.135
+    output_x = 0.340
+    output_w = 0.320
+    output_h = 0.112
+
     box(
-        (0.340, 0.690),
-        (0.190, 0.130),
+        (left_x, y_input),
+        (box_w, box_h),
+        "Pre-event market state",
+        r"$X_{<t}$",
+        palette["input"],
+    )
+    box((right_x, y_input), (box_w, box_h), "SEC 8-K disclosure", r"$e_t$", "#fffbe6")
+    box(
+        (left_x, y_encoder),
+        (box_w, box_h),
         "No-event distribution",
         r"$(\mu_0,\sigma_0)$",
         palette["state"],
-        title_size=9.4,
+        title_size=9.6,
         subtitle_size=9.2,
     )
     box(
-        (0.340, 0.295),
-        (0.190, 0.130),
+        (right_x, y_encoder),
+        (box_w, box_h),
         "Disclosure bridge",
         r"$B(e_t)$",
         palette["bridge"],
-        title_size=9.4,
+        title_size=9.6,
         subtitle_size=9.2,
     )
 
     box(
-        (0.625, 0.690),
-        (0.200, 0.130),
+        (left_x, y_transport),
+        (box_w, box_h),
         "Protected mean",
         r"$\Delta\mu_r=0$",
         palette["constraint"],
-        title_size=9.2,
+        title_size=9.6,
         subtitle_size=9.0,
     )
     box(
-        (0.625, 0.295),
-        (0.200, 0.130),
+        (right_x, y_transport),
+        (box_w, box_h),
         "Allowed shifts",
         r"$\Delta\mu_{\sigma,V},\ \Delta\log\sigma^2$",
         palette["transport"],
-        title_size=9.0,
+        title_size=9.4,
         subtitle_size=8.2,
     )
     box(
-        (0.890, 0.455),
-        (0.095, 0.190),
+        (output_x, y_output),
+        (output_w, output_h),
         "Event response",
         r"$(\mu_1,\sigma_1)$",
         palette["output"],
-        title_size=7.8,
-        subtitle_size=8.6,
+        title_size=9.6,
+        subtitle_size=9.2,
     )
 
-    edge_gap = 0.010
-    arrow((0.260 + edge_gap, 0.755), (0.340 - edge_gap, 0.755))
-    arrow((0.260 + edge_gap, 0.360), (0.340 - edge_gap, 0.360))
+    edge_gap = 0.012
+    left_center = left_x + box_w / 2
+    right_center = right_x + box_w / 2
+    output_top = y_output + output_h
+
+    arrow((left_center, y_input - edge_gap), (left_center, y_encoder + box_h + edge_gap))
+    arrow((right_center, y_input - edge_gap), (right_center, y_encoder + box_h + edge_gap))
     arrow(
-        (0.530 + edge_gap, 0.755),
-        (0.625 - edge_gap, 0.755),
+        (left_center, y_encoder - edge_gap),
+        (left_center, y_transport + box_h + edge_gap),
         color=palette["protected"],
         lw=1.25,
     )
     arrow(
-        (0.530 + edge_gap, 0.360),
-        (0.625 - edge_gap, 0.360),
+        (right_center, y_encoder - edge_gap),
+        (right_center, y_transport + box_h + edge_gap),
         color=palette["muted"],
         lw=1.20,
     )
     elbow_arrow(
         [
-            (0.825 + edge_gap, 0.755),
-            (0.858, 0.755),
-            (0.858, 0.620),
-            (0.890 - edge_gap, 0.620),
+            (left_center, y_transport - edge_gap),
+            (left_center, 0.300),
+            (0.430, 0.300),
+            (0.430, output_top + edge_gap),
         ],
         color=palette["protected"],
         lw=1.20,
     )
     elbow_arrow(
         [
-            (0.825 + edge_gap, 0.360),
-            (0.858, 0.360),
-            (0.858, 0.500),
-            (0.890 - edge_gap, 0.500),
+            (right_center, y_transport - edge_gap),
+            (right_center, 0.300),
+            (0.570, 0.300),
+            (0.570, output_top + edge_gap),
         ],
         color=palette["line"],
         lw=1.20,
