@@ -394,9 +394,3 @@ This is a research project using public filings and public daily prices. The res
   note    = {Preprint. Code: \url{https://github.com/aryan-cs/distributional-jump-bridges}}
 }
 ```
-
----
-
-## License
-
-This project is released for academic research purposes. Please see the repository for licensing details.
