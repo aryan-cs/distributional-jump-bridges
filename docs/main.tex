@@ -41,6 +41,7 @@
     pdftitle={Distributional Jump Bridges for Disclosure Response Forecasts},
     pdfauthor={Aryan Gupta}
 }
+\providecommand{\doi}[1]{\href{https://doi.org/#1}{doi:#1}}
 
 \title{Distributional Jump Bridges for Disclosure Response Forecasts}
 \author{
@@ -79,9 +80,9 @@ cluster-significant return ranking.
 Public disclosures are timed interventions in the market information set
 \citep{fama1970efficient,beaver1968information,patell1984anticipated}. A filing can change
 volatility, liquidity, and uncertainty even when its effect on cross-sectional abnormal-return
-ranking is weak or unstable \citep{bamber1986volume,kothari2001capital}. Standard multimodal
-forecasters typically concatenate price history and text embeddings, then predict all targets with a
-shared head \citep{vaswani2017attention,lim2021temporal,chen2025camef}. This design asks the same
+ranking is weak or unstable \citep{bamber1986volume,kothari2001capital}. Neural sequence and
+multimodal forecasters often fuse histories, event information, or text before predicting market
+targets \citep{vaswani2017attention,lim2021temporal,chen2025camef}. This design can ask the same
 text representation to explain risk response, volume response, uncertainty, and return ranking. In
 financial data, that coupling can be problematic: return labels are noisy, text is high dimensional,
 and small leakage, data snooping, or backtest overfitting can be mistaken for predictive structure
@@ -244,7 +245,7 @@ and evaluation is a proper likelihood-based scoring objective \citep{gneiting200
     \qquad K=3,\quad \ell_{1,ik}\in[-7,3].
 \end{equation}
 The pairwise rank regularizer is computed only over real-disclosure pairs in a minibatch, following
-pairwise learning-to-rank objectives \citep{burges2005learning,cao2007learning}:
+standard learning-to-rank objectives \citep{burges2005learning,cao2007learning}:
 \begin{equation}
     \mathcal{L}_{rank}
     = \frac{1}{|\mathcal{Q}|}\sum_{(i,j)\in\mathcal{Q}}
