@@ -12,5 +12,5 @@ Cross-list category: cs.LG
 
 Comments: Preprint. Code is available at https://github.com/aryan-cs/distributional-jump-bridges.
 
-Source root: submit the contents of `paper/` so that `main.tex` can resolve `figures/...`,
+Source root: submit the contents of `docs/` so that `main.tex` can resolve `figures/...`,
 `tables/...`, and `references.bib` with relative paths.

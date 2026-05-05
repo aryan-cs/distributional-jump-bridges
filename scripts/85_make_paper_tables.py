@@ -11,7 +11,7 @@ from cebt.evaluation.bootstrap import paired_bootstrap_ci
 from cebt.evaluation.metrics import rank_ic
 from cebt.utils.io import read_json, read_jsonl, write_csv, write_json
 
-PAPER_TABLE_DIR = Path("paper/tables")
+PAPER_TABLE_DIR = Path("docs/tables")
 MODEL_SOURCES = {
     "no_event": Path("data/runs/paper_v3"),
     "concat": Path("data/runs/paper_v3"),

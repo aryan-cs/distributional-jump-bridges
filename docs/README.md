@@ -4,6 +4,7 @@ This directory contains the current DJB paper draft.
 
 - `main.tex` is the LaTeX source.
 - `main.pdf` is the current compiled paper snapshot.
+- `djb.pdf` is a submitter-friendly copy of the compiled paper.
 - `references.bib` contains the bibliography.
 - `figures/` contains generated paper figures copied from the paper-scale run.
 - `tables/` contains generated CSV tables copied from the paper-scale run.
@@ -15,8 +16,8 @@ held-out rows.
 Build the PDF with:
 
 ```bash
-tectonic paper/main.tex --outdir paper
+cd docs && tectonic main.tex
 ```
 
-LaTeX intermediates are intentionally gitignored. The paper source, compiled
+LaTeX intermediates are intentionally gitignored. The manuscript source, compiled
 snapshot, tables, and figures are tracked.

@@ -35,7 +35,7 @@ docs/                 Research notes, literature map, and paper outline
 src/                 Python package for data, features, models, training, evaluation, and analysis
 scripts/              Config-driven pipeline entrypoints
 tests/                Unit and smoke tests
-paper/                Paper draft assets
+docs/                 Paper draft assets and research notes
 data/                 Local data cache; generated artifacts are gitignored
 ```
 
@@ -124,8 +124,8 @@ operator-fusion baselines, and uses the return-conservative variant to audit how
 return-mean transport changes the learned response distribution. It does not claim to be a trading
 system or to dominate every MSE-only ablation.
 
-The current draft lives at `paper/main.tex`, the compiled PDF is `paper/main.pdf`, figures are in
-`paper/figures/`, and table exports are in `paper/tables/`.
+The current draft lives at `docs/main.tex`, the compiled PDF is `docs/main.pdf`, figures are in
+`docs/figures/`, and table exports are in `docs/tables/`.
 
 The GitHub repository contains source code, configs, tests, table/figure scripts, and paper source.
 Generated artifacts such as processed metadata, downloaded prices, checkpoints, and cached

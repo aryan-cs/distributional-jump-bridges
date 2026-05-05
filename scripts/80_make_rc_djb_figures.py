@@ -15,9 +15,9 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Patch
 from matplotlib.path import Path as MplPath
 from matplotlib.ticker import FuncFormatter
 
-METRICS_PATH = Path("paper/tables/table_eval_metrics.csv")
-INTERVENTIONS_PATH = Path("paper/tables/table_rc_djb_interventions.csv")
-INTERVENTION_PAIRED_PATH = Path("paper/tables/table_rc_djb_intervention_paired.csv")
+METRICS_PATH = Path("docs/tables/table_eval_metrics.csv")
+INTERVENTIONS_PATH = Path("docs/tables/table_rc_djb_interventions.csv")
+INTERVENTION_PAIRED_PATH = Path("docs/tables/table_rc_djb_intervention_paired.csv")
 FEATURE_METADATA_PATH = Path("data/processed/paper_v3_bge/features_metadata.jsonl")
 RCDJB_FULL_PATH = Path("data/runs/paper_v3_bge_rc_djb_best/rc_djb_predictions.jsonl")
 RCDJB_NO_JUMP_PATH = Path("data/runs/paper_v3_bge_rc_djb_best/rc_djb_no_jump_predictions.jsonl")
@@ -58,7 +58,7 @@ COLOR_MODELS = {
 
 
 def main() -> None:
-    output_dir = Path("paper/figures")
+    output_dir = Path("docs/figures")
     output_dir.mkdir(parents=True, exist_ok=True)
     _set_style()
     make_architecture_figure(output_dir / "rc_djb_architecture.png")
