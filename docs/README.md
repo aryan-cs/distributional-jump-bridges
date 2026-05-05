@@ -6,7 +6,7 @@ This directory contains the current DJB paper draft.
 - `main.pdf` is the current compiled paper snapshot.
 - `djb.pdf` is a submitter-friendly copy of the compiled paper.
 - `references.bib` contains the bibliography.
-- `figures/` contains generated paper figures copied from the paper-scale run.
+- `figures/` contains the PDF figures used by the manuscript. PNG previews are generated locally when needed but are not tracked.
 - `tables/` contains generated CSV tables copied from the paper-scale run.
 
 The current draft reports the `configs/paper_v3.yaml` run: 98 usable large

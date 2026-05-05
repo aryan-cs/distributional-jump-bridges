@@ -35,7 +35,6 @@ docs/                 Research notes, literature map, and paper outline
 src/                 Python package for data, features, models, training, evaluation, and analysis
 scripts/              Config-driven pipeline entrypoints
 tests/                Unit and smoke tests
-docs/                 Paper draft assets and research notes
 data/                 Local data cache; generated artifacts are gitignored
 ```
 
