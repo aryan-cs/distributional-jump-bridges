@@ -13,6 +13,8 @@
 \usepackage{natbib}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{newtxtext}
+\usepackage{newtxmath}
 \usepackage{xcolor}
 \definecolor{paperink}{HTML}{242424}
 \definecolor{paperblue}{HTML}{5891ED}
@@ -687,7 +689,7 @@ response depends on the event, firm, and market state
 
 The public code repository provides the configurations, data-ingestion scripts, model
 implementations, evaluation code, tables, and figure-generation scripts used in this study:
-\url{https://github.com/aryan-cs/distributional-jump-bridges}. Large generated artifacts such as processed
+\href{https://github.com/aryan-cs/distributional-jump-bridges}{github.com/aryan-cs/distributional-jump-bridges}. Large generated artifacts such as processed
 metadata, checkpoints, cached predictions, and downloaded market files are not tracked in Git; they
 are reproducible from the documented pipeline. Automated tests cover timestamp gating, after-hours
 label starts, feature leakage rejection, control construction, deterministic tensor generation,
