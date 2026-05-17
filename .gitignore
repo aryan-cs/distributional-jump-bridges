@@ -21,6 +21,5 @@ docs/*.blg
 docs/*.log
 docs/*.out
 docs/*.pdf
-!docs/main.pdf
 !docs/djb.pdf
 docs/figures/*.png

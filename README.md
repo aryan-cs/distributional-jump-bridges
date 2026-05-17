@@ -351,16 +351,6 @@ pytest tests/test_model_and_loss.py
 
 ---
 
-## Building the Paper
-
-```bash
-cd docs && tectonic main.tex
-```
-
-A pre-compiled snapshot is available at [`docs/djb.pdf`](docs/djb.pdf).
-
----
-
 ## Limitations
 
 - **Sample scope**: 98 large-cap U.S. firms — not a broad equity universe. Generalization to small-cap, international, or low-liquidity samples is untested.
